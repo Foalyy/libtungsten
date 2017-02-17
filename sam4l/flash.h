@@ -34,6 +34,7 @@ namespace Flash {
     
     // Constants
     const uint32_t FSR_FRDY = 0;
+    const uint32_t FSR_HSMODE = 6;
     const uint32_t FCMD_CMD = 0;
     const uint32_t FCMD_CMD_NOP = 0;
     const uint32_t FCMD_CMD_WP = 1;
@@ -67,6 +68,8 @@ namespace Flash {
     void readUserPage(uint32_t data[]);
     void eraseUserPage();
     void writeUserPage(const uint32_t data[]);
+    void enableHighSpeedMode();
+    void disableHighSpeedMode();
 
 }
 

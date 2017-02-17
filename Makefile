@@ -3,7 +3,7 @@ ifndef ROOTDIR
 	ROOTDIR=.
 endif
 LIBNAME=libtungsten
-CORE_MODULES=pins_$(CHIP_FAMILY)_$(PACKAGE) core dma scif bscif pm bpm ast gpio usb error
+CORE_MODULES=pins_$(CHIP_FAMILY)_$(PACKAGE) core dma flash scif bscif pm bpm ast gpio usb error
 LIB_MODULES=$(CORE_MODULES) $(MODULES)
 LIB_OBJS=$(addprefix $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/,$(addsuffix .o,$(LIB_MODULES)))
 EXT_OBJS=$(addsuffix .o,$(EXT_MODULES))
@@ -44,8 +44,7 @@ OPENOCD=openocd
 ARCH_FLAGS=-mthumb -mcpu=cortex-m$(CORTEX_M)
 
 # Startup code
-STARTUP=$(ROOTDIR)/$(LIBNAME)/startup_ARMCM$(CORTEX_M).S
-STARTUP_DEFS=-D__STARTUP_CLEAR_BSS -D__NO_SYSTEM_INIT -D__START=main
+STARTUP=$(ROOTDIR)/$(LIBNAME)/startup.cpp
 
 # Defines passed to the preprocessor using -D
 ifdef BOOTLOADER
@@ -63,7 +62,7 @@ ifdef DEBUG
 else
 	OPTFLAGS=-Os -flto -ffunction-sections -fdata-sections
 endif
-CXXFLAGS=$(ARCH_FLAGS) $(STARTUP_DEFS) -I$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) -I$(ROOTDIR)/$(LIBNAME) -std=c++11 -Wall $(OPTFLAGS) $(PREPROC_DEFINES) $(ADD_CXXFLAGS)
+CXXFLAGS=$(ARCH_FLAGS) $(STARTUP_DEFS) -I$(ROOTDIR)/$(LIBNAME) -I$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) -std=c++11 -Wall $(OPTFLAGS) $(PREPROC_DEFINES) $(ADD_CXXFLAGS)
 
 # Linking flags
 ifndef LDSCRIPTNAME
@@ -72,8 +71,10 @@ endif
 ifdef BOOTLOADER
 	LDSCRIPTNAME=usercode_bootloader.ld
 endif
-LDSCRIPTS=-L$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) -L$(ROOTDIR)/$(LIBNAME) -L$(ROOTDIR)/$(LIBNAME)/startup -L. -T $(LDSCRIPTNAME)
-#MAP=-Wl,-Map=$(NAME).map
+LDSCRIPTS=-L$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) -L$(ROOTDIR)/$(LIBNAME) -L. -T $(LDSCRIPTNAME)
+ifdef CREATE_MAP
+	MAP=-Wl,-Map=$(NAME).map
+endif
 LFLAGS=--specs=nano.specs --specs=nosys.specs $(LDSCRIPTS) -Wl,--gc-sections $(MAP)
 
 
@@ -99,10 +100,10 @@ _echo_comp_ext_objs:
 	@echo "== Compiling external modules..."
 
 # Compile user code in the standard ELF format
-$(NAME).elf: $(NAME).cpp $(STARTUP) _echo_comp_lib_objs $(LIB_OBJS) _echo_comp_ext_objs $(EXT_OBJS)
+$(NAME).elf: $(NAME).cpp $(STARTUP) $(STARTUP_DEP) _echo_comp_lib_objs $(LIB_OBJS) _echo_comp_ext_objs $(EXT_OBJS)
 	@echo ""
 	@echo "== Compiling ELF..."
-	$(CXX) $(CXXFLAGS) $(LFLAGS) $(NAME).cpp $(STARTUP) $(LIB_OBJS) $(EXT_OBJS) -o $@
+	$(CXX) $(CXXFLAGS) $(LFLAGS) $(NAME).cpp $(STARTUP) $(STARTUP_DEP) $(LIB_OBJS) $(EXT_OBJS) -o $@
 
 # Convert from ELF to iHEX format
 $(NAME).hex: $(NAME).elf

@@ -121,7 +121,7 @@ namespace ADC {
             vref = (vref * 625) / 1000;
         } else if (_analogReference == AnalogReference::VCC_OVER_2) {
             vref = vref / 2;
-        } else if (_analogReference == INTERNAL_1V) {
+        } else if (_analogReference == AnalogReference::INTERNAL_1V) {
             vref = 1000;
         }
 

@@ -1,6 +1,7 @@
 #include "bpm.h"
 #include "pm.h"
 #include "eic.h"
+#include "flash.h"
 #include "error.h"
 
 namespace BPM {
@@ -14,6 +15,11 @@ namespace BPM {
     void interruptHandlerWrapper();
 
     void setPowerScaling(PowerScaling ps) {
+        // Enable Flash High Speed mode if entering PS2
+        if (ps == PowerScaling::PS2) {
+            Flash::enableHighSpeedMode();
+        }
+
         // Unlock the PMCON register, which is locked by default as a safety mesure
         (*(volatile uint32_t*)(BASE + OFFSET_UNLOCK))
                 = UNLOCK_KEY               // KEY : Magic word (see datasheet)
@@ -27,6 +33,11 @@ namespace BPM {
 
         // Wait for the Power Scaling OK flag
         while (!(*(volatile uint32_t*)(BASE + OFFSET_SR) & (1 << SR_PSOK)));
+
+        // Disable Flash High Speed mode if exiting PS2
+        if (_currentPS == PowerScaling::PS2) {
+            Flash::disableHighSpeedMode();
+        }
 
         // Save the current setting
         _currentPS = ps;

@@ -106,4 +106,21 @@ namespace Flash {
             | FCMD_KEY;                 // KEY : write protection key
     }
 
+    void enableHighSpeedMode() {
+        // FCMD (Flash Command Register) : issue a High Speed Enable command
+        (*(volatile uint32_t*)(FLASH_BASE + OFFSET_FCMD))
+            = FCMD_CMD_HSEN << FCMD_CMD  // CMD : command code to issue (HSEN = High Speed Enable)
+            | FCMD_KEY;                  // KEY : write protection key
+
+        // Wait untile HS mode is enabled
+        while (!((*(volatile uint32_t*)(FLASH_BASE + OFFSET_FSR)) & (1 << FSR_HSMODE)));
+    }
+
+    void disableHighSpeedMode() {
+        // FCMD (Flash Command Register) : issue a High Speed Disable command
+        (*(volatile uint32_t*)(FLASH_BASE + OFFSET_FCMD))
+            = FCMD_CMD_HSDIS << FCMD_CMD // CMD : command code to issue (HSEN = High Speed Disable)
+            | FCMD_KEY;                  // KEY : write protection key
+    }
+
 }

@@ -304,7 +304,9 @@ namespace USART {
         int n = 0;
         for (int i = 0; i < size && i < avail; i++) {
             // Copy the next char from the port's RX buffer to the user buffer
-            buffer[i] = p->rxBuffer[p->rxBufferCursor];
+            if (buffer != nullptr) {
+                buffer[i] = p->rxBuffer[p->rxBufferCursor];
+            }
 
             // Keep track of the number of bytes written
             n++;
@@ -319,7 +321,7 @@ namespace USART {
             }
             
             // If the "read until" mode is selected, exit the loop if the selected byte is found
-            if (readUntil && buffer[i] == end) {
+            if (readUntil && buffer != nullptr && buffer[i] == end) {
                 break;
             }
         }
@@ -484,6 +486,7 @@ namespace USART {
     }
 
     void waitFinished(Port port, unsigned long timeout) {
+        struct USART* p = &(_ports[static_cast<int>(port)]);
         unsigned long tStart = Core::time();
         int n = available(port);
         while (n == 0) {
@@ -492,8 +495,9 @@ namespace USART {
                 return;
             }
         }
+        unsigned long byteDuration = 1000000UL / p->baudrate * 8; // in us
         while (1) {
-            Core::waitMicroseconds(2000);
+            Core::waitMicroseconds(5 * byteDuration); // Wait for 5 times the duration of a byte
             int n2 = available(port);
             if (n2 == n) {
                 // No byte received during the delay, the transfer looks finished
