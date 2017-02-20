@@ -277,8 +277,8 @@ namespace GPIO {
     void interruptHandlerWrapper() {
         // Get the port and pin numbers which called this interrupt
         int channel = static_cast<int>(Core::currentInterrupt()) - static_cast<int>(Core::Interrupt::GPIO0);
-        int port = channel / 4;
-        int subport = channel - port;
+        int port = channel / 4; // There are four 8-pin channels in each port. The division int truncate is voluntary.
+        int subport = channel - 4 * port; // Equivalent to subport = channel % 4
         const uint32_t REG_BASE = GPIO_BASE + port * PORT_REG_SIZE;
         uint32_t flag = ((volatile RSCT_REG*)(REG_BASE + OFFSET_IFR))->RW & ((volatile RSCT_REG*)(REG_BASE + OFFSET_IER))->RW;
         flag >>= subport * 8;
@@ -289,9 +289,10 @@ namespace GPIO {
             }
             flag >>= 1;
         }
+        pin += subport * 8;
 
         // Call the user handler for this interrupt
-        void (*handler)() = (void (*)())_interruptHandlers[port * 32 + subport * 8 + pin];
+        void (*handler)() = (void (*)())_interruptHandlers[port * 32 + pin];
         if (handler == nullptr) {
             Error::happened(Error::Module::GPIO, ERR_HANDLER_NOT_DEFINED, Error::Severity::CRITICAL);
         } else {
