@@ -128,6 +128,11 @@ namespace USB {
         SCIF::enablePLL(1, 0, SCIF::GCLKSource::RCFAST, 12000000UL);
         SCIF::enableGenericClock(SCIF::GCLKChannel::GCLK7_USB, SCIF::GCLKSource::PLL0);
 
+        // Check the clock
+        if (!((*(volatile uint32_t*)(USB_BASE + OFFSET_USBSTA)) & (1 << USBSTA_CLKUSABLE))) {
+            Error::happened(Error::Module::USB, ERR_CLOCK_NOT_USABLE, Error::Severity::CRITICAL);
+        }
+
         // Enable signal pins
         GPIO::enablePeripheral(PIN_DM);
         GPIO::enablePeripheral(PIN_DP);
@@ -137,9 +142,6 @@ namespace USB {
             = 0 << USBCON_FRZCLK   // FRZCLK : unfreeze input clocks
             | 1 << USBCON_USBE     // USBE : enable controller
             | 1 << USBCON_UIMOD;   // UIMOD : set in device mode
-
-        // Wait until the clock stabilizes
-        while (!((*(volatile uint32_t*)(USB_BASE + OFFSET_USBSTA)) & (1 << USBSTA_CLKUSABLE)));
 
         // Initialize memory buffers
         memset(_endpoints, 0, sizeof(_endpoints));

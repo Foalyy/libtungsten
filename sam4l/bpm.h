@@ -32,6 +32,7 @@ namespace BPM {
     const uint32_t SR_PSOK = 0;
     const uint32_t SR_AE = 1;
     const uint32_t UNLOCK_ADDR = 0;
+    const uint32_t UNLOCK_KEY = 0xAA << 24;
     const uint32_t PMCON_PS = 0;
     const uint32_t PMCON_PSCREQ = 2;
     const uint32_t PMCON_PSCM = 3;  // Undocumented bit : set to 1 to make a no-halt change
@@ -48,7 +49,6 @@ namespace BPM {
 
 
     // Constants
-    const uint32_t UNLOCK_KEY = 0xAA << 24;
     enum class PowerScaling {
         PS0 = 0,
         PS1 = 1,
@@ -75,6 +75,13 @@ namespace BPM {
         PICOUART = 5,
     };
 
+    // Source for the reference 32KHz (and 1KHz) clocks,
+    // used by the AST among others
+    enum class CLK32KSource {
+        OSC32K, // External crystal
+        RC32K,  // Internal RC
+    };
+
     const int N_INTERRUPTS = 1;
     enum class Interrupt {
         PSOK = 0,
@@ -95,6 +102,9 @@ namespace BPM {
     void disableBackupWakeUpSources();
     void enableBackupPin(unsigned int eicChannel);
     void disableBackupPin(unsigned int eicChannel);
+
+    // 32KHz clock selection
+    void set32KHzClockSource(CLK32KSource source);
 
     // Interrupts
     void enableInterrupt(void (*handler)(), Interrupt interrupt=Interrupt::PSOK);

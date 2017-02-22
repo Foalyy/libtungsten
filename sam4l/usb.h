@@ -136,6 +136,9 @@ namespace USB {
     const int CTR_STA_OVERF = 17;
     const int CTR_STA_UNDERF = 18;
 
+    // Error codes
+    const Error::Code ERR_CLOCK_NOT_USABLE = 0x0001;
+
 
     // USB Device states
     enum class State {

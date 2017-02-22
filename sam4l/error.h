@@ -21,7 +21,8 @@ namespace Error {
         TC,
         USART,
         WDT,
-        EIC
+        EIC,
+        USB
     };
 
     using Code = uint16_t;

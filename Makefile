@@ -2,10 +2,17 @@
 ifndef ROOTDIR
 	ROOTDIR=.
 endif
+ifndef MODULES
+	MODULES=adc dac eic gloc i2c spi tc trng usart wdt
+endif
+ifndef UTILS_MODULES
+	UTILS_MODULES=RingBuffer
+endif
 LIBNAME=libtungsten
 CORE_MODULES=pins_$(CHIP_FAMILY)_$(PACKAGE) core dma flash scif bscif pm bpm ast gpio usb error
 LIB_MODULES=$(CORE_MODULES) $(MODULES)
 LIB_OBJS=$(addprefix $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/,$(addsuffix .o,$(LIB_MODULES)))
+UTILS_OBJS=$(addprefix $(ROOTDIR)/$(LIBNAME)/utils/,$(addsuffix .o,$(UTILS_MODULES)))
 EXT_OBJS=$(addsuffix .o,$(EXT_MODULES))
 
 # Default options
@@ -62,7 +69,11 @@ ifdef DEBUG
 else
 	OPTFLAGS=-Os -flto -ffunction-sections -fdata-sections
 endif
-CXXFLAGS=$(ARCH_FLAGS) $(STARTUP_DEFS) -I$(ROOTDIR)/$(LIBNAME) -I$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) -std=c++11 -Wall $(OPTFLAGS) $(PREPROC_DEFINES) $(ADD_CXXFLAGS)
+CXXFLAGS=$(ARCH_FLAGS) $(STARTUP_DEFS) \
+	-I$(ROOTDIR)/$(LIBNAME) \
+	-I$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) \
+	-I$(ROOTDIR)/$(LIBNAME)/utils \
+	-std=c++11 -Wall $(OPTFLAGS) $(PREPROC_DEFINES) $(ADD_CXXFLAGS)
 
 # Linking flags
 ifndef LDSCRIPTNAME
@@ -80,7 +91,7 @@ LFLAGS=--specs=nano.specs --specs=nosys.specs $(LDSCRIPTS) -Wl,--gc-sections $(M
 
 ### RULES
 
-.PHONY: flash pause reset debug codeuploader upload bootloader flash-bootloader debug-bootloader openocd clean clean-all _echo_comp_lib_objs _echo_comp_ext_objs
+.PHONY: flash pause reset debug flash-debug codeuploader upload bootloader flash-bootloader debug-bootloader openocd clean clean-all _echo_comp_lib_objs _echo_comp_ext_objs
 
 ## Usercode-related rules
 
@@ -100,10 +111,10 @@ _echo_comp_ext_objs:
 	@echo "== Compiling external modules..."
 
 # Compile user code in the standard ELF format
-$(NAME).elf: $(NAME).cpp $(STARTUP) $(STARTUP_DEP) _echo_comp_lib_objs $(LIB_OBJS) _echo_comp_ext_objs $(EXT_OBJS)
+$(NAME).elf: $(NAME).cpp $(STARTUP) $(STARTUP_DEP) _echo_comp_lib_objs $(LIB_OBJS) $(UTILS_OBJS) _echo_comp_ext_objs $(EXT_OBJS)
 	@echo ""
 	@echo "== Compiling ELF..."
-	$(CXX) $(CXXFLAGS) $(LFLAGS) $(NAME).cpp $(STARTUP) $(STARTUP_DEP) $(LIB_OBJS) $(EXT_OBJS) -o $@
+	$(CXX) $(CXXFLAGS) $(LFLAGS) $(NAME).cpp $(STARTUP) $(STARTUP_DEP) $(LIB_OBJS) $(UTILS_OBJS) $(EXT_OBJS) -o $@
 
 # Convert from ELF to iHEX format
 $(NAME).hex: $(NAME).elf
@@ -148,6 +159,8 @@ reset:
 debug: pause
 	$(GDB) -ex "set print pretty on" -ex "target extended-remote localhost:3333" $(NAME).elf
 
+flash-debug: flash debug
+
 ## Codeuploader-related rules
 
 # Compile the codeuploader
@@ -186,6 +199,6 @@ debug-bootloader: halt
 clean: clean-all
 
 clean-all: 
-	rm -f $(NAME).elf $(NAME).map $(NAME).hex *.o $(ROOTDIR)/$(LIBNAME)/*.o $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/*.o
+	rm -f $(NAME).elf $(NAME).map $(NAME).hex *.o $(ROOTDIR)/$(LIBNAME)/*.o $(ROOTDIR)/utils/*.o $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/*.o
 	cd $(ROOTDIR)/$(LIBNAME)/bootloader; rm -f bootloader.elf bootloader.hex *.o
 	cd $(ROOTDIR)/$(LIBNAME)/codeuploader; rm -f codeuploader *.o

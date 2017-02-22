@@ -126,6 +126,25 @@ namespace BPM {
         }
     }
 
+    void set32KHzClockSource(CLK32KSource source) {
+        // Read PMCON (Power Mode Control Register) and reset the CK32S field
+        uint32_t pmcon = (*(volatile uint32_t*)(BASE + OFFSET_PMCON)) & ~(uint32_t)(1 << PMCON_CK32S);
+
+        // Select the source
+        if (source == CLK32KSource::RC32K) {
+            pmcon |= 1 << PMCON_CK32S;
+        }
+
+        // Unlock the PMCON register, which is locked by default as a safety mesure
+        (*(volatile uint32_t*)(BASE + OFFSET_UNLOCK))
+                = UNLOCK_KEY               // KEY : Magic word (see datasheet)
+                | OFFSET_PMCON;            // ADDR : unlock PMCON
+
+        // Write PMCON back
+        (*(volatile uint32_t*)(BASE + OFFSET_PMCON))
+            = pmcon;
+    }
+
     void enableInterrupt(void (*handler)(), Interrupt interrupt) {
         // Save the user handler
         _interruptHandlers[static_cast<int>(interrupt)] = (uint32_t)handler;
