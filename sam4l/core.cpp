@@ -17,6 +17,10 @@ namespace Core {
     // and http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0553a/Ciheijba.html.
     uint32_t _isrVector[N_INTERNAL_EXCEPTIONS + N_EXTERNAL_INTERRUPTS] __attribute__ ((aligned (512)));
 
+    // Keep track of the current state of the AST alarm for sleep()
+    volatile bool _astAlarmTriggered = false;
+    void handlerASTAlarm();
+
 
     // Initialize the core components : exceptions/interrupts table, 
     // clocks, SysTick (system timer), ...
@@ -129,6 +133,14 @@ namespace Core {
 
     // Sleep for a specified amount of time
     void sleep(SleepMode mode, unsigned long length, TimeUnit unit) {
+        // Select the correct sleep mode
+        if (mode >= SleepMode::SLEEP0 && mode <= SleepMode::SLEEP3) {
+            *(volatile uint32_t*) SCR &= ~(uint32_t)(1 << SCR_SLEEPDEEP);
+        } else {
+            *(volatile uint32_t*) SCR |= 1 << SCR_SLEEPDEEP;
+        }
+        BPM::setSleepMode(mode);
+
         // The length is optional, if not specified the chip will sleep until an event
         // wakes it up. See PM::enableWakeUpSource() and BPM::enableBackupWakeUpSource().
         if (length > 0) {
@@ -139,16 +151,9 @@ namespace Core {
 
             // Enable an alarm to wake up the chip after a specified
             // amount of time
-            AST::enableAlarm(length, true);
+            _astAlarmTriggered = false;
+            AST::enableAlarm(length, true, handlerASTAlarm);
         }
-
-        // Select the correct sleep mode
-        if (mode >= SleepMode::SLEEP0 && mode <= SleepMode::SLEEP3) {
-            *(volatile uint32_t*) SCR &= ~(uint32_t)(1 << SCR_SLEEPDEEP);
-        } else {
-            *(volatile uint32_t*) SCR |= 1 << SCR_SLEEPDEEP;
-        }
-        BPM::setSleepMode(mode);
 
         // Sleep until a known event happens
         do {
@@ -157,12 +162,19 @@ namespace Core {
             // an interrupt with a sufficient priority is triggered
             // See §B1.5.17 Power Management in the ARMv7-M Architecture Reference Manual
             __asm__ __volatile__("WFI");
-        } while (PM::wakeUpCause() == PM::WakeUpCause::UNKNOWN);
+        } while (length > 0 
+                    ? !_astAlarmTriggered                             // If length is specified, wait until the AST alarm is triggered
+                    : PM::wakeUpCause() == PM::WakeUpCause::UNKNOWN); // Otherwise, wait for any interrupt
+        _astAlarmTriggered = false;
     }
 
     // The default sleep mode is SLEEP0
     void sleep(unsigned long length, TimeUnit unit) {
         sleep(SleepMode::SLEEP0, length, unit);
+    }
+
+    void handlerASTAlarm() {
+        _astAlarmTriggered = true;
     }
 
     // Enable SysTick as a simple counter clocked on the CPU clock
@@ -173,7 +185,7 @@ namespace Core {
 
         *(volatile uint32_t*) SYST_CSR
             = 1 << SYST_CSR_ENABLE      // Enable counter
-            | 1 << SYST_CSR_TICKINT;    // Enable interrupt when the counter reaches 0
+            | 0 << SYST_CSR_TICKINT;    // Disable interrupt when the counter reaches 0
     }
 
     // Disable SysTick

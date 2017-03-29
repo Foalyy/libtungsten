@@ -3,6 +3,7 @@
 #include "dma.h"
 #include "gpio.h"
 #include "error.h"
+#include <string.h>
 
 namespace SPI {
 
@@ -19,8 +20,9 @@ namespace SPI {
     int _txDMAChannel = -1;
     int _nSlaves = 0;
 
-    const uint8_t DUMMY_BYTES[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; // Used for the DMA channel
-    const int DUMMY_BYTES_SIZE = 8;
+    // Used for the DMA channel
+    const int DUMMY_BYTES_SIZE = 64;
+    uint8_t DUMMY_BYTES[DUMMY_BYTES_SIZE];
     int _dummyBytesCounter = 0;
 
     volatile bool _txDMAChannelFinished = false;
@@ -30,6 +32,9 @@ namespace SPI {
 
 
     void enableMaster() {
+        // Initialize the dummy bytes buffer to 0
+        memset(DUMMY_BYTES, 0, sizeof(DUMMY_BYTES));
+        
         // Set the pins in peripheral mode
         GPIO::enablePeripheral(PIN_MISO);
         GPIO::enablePeripheral(PIN_MOSI);

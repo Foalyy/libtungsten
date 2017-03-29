@@ -253,20 +253,20 @@ namespace USB {
         SIZE16 = 0b001,
         SIZE32 = 0b010,
         SIZE64 = 0b011,
-        SIZE128 = 0b100,
-        SIZE256 = 0b101,
-        SIZE512 = 0b110,
-        SIZE1024 = 0b111
+        //SIZE128 = 0b100, // Unavailable for low- and full-speed
+        //SIZE256 = 0b101,
+        //SIZE512 = 0b110,
+        //SIZE1024 = 0b111
     };
     const int EP_SIZES[] = {
         8,
         16,
         32,
         64,
-        128,
-        256,
-        512,
-        1024
+        //128, // Unavailable for low- and full-speed
+        //256,
+        //512,
+        //1024
     };
     enum class EPDir {
         OUT = 0,
@@ -293,7 +293,7 @@ namespace USB {
         EPSize size;
         uint8_t* bank0;
         uint8_t* bank1;
-        int (*handlers[static_cast<int>(EPHandlerType::NUMBER)])(); // Array of function pointers of EPHandlerType
+        int (*handlers[static_cast<int>(EPHandlerType::NUMBER)])(int); // Array of function pointers of EPHandlerType
         EndpointDescriptor descriptor;
     };
     using Endpoint = int; // Helper type to manage endpoints, created by newEndpoint()
@@ -358,16 +358,18 @@ namespace USB {
     // Module API
     void initDevice();
     Endpoint newEndpoint(EPType type, EPDir direction, EPBanks nBanks, EPSize size, uint8_t* bank0, uint8_t* bank1=nullptr);
-    void setEndpointHandler(Endpoint endpointNumber, EPHandlerType handlerType, int (*handler)());
+    void setEndpointHandler(Endpoint endpointNumber, EPHandlerType handlerType, int (*handler)(int));
     void enableINInterrupt(Endpoint endpointNumber);
+    void disableINInterrupt(Endpoint endpointNumber);
+    void abortINTransfer(Endpoint endpointNumber);
     void setConnectedHandler(void (*handler)());
     void setDisconnectedHandler(void (*handler)());
     void setStartOfFrameHandler(void (*handler)());
     void setControlHandler(void (*handler)(SetupPacket &_lastSetupPacket, uint8_t* data, int &size));
     void interruptHandler();
-    int ep0SETUPHandler();
-    int ep0INHandler();
-    int ep0OUTHandler();
+    int ep0SETUPHandler(int unused);
+    int ep0INHandler(int unused);
+    int ep0OUTHandler(int size);
     void remoteWakeup();
     void addDbgEvent(enum EventType event, uint32_t data=0);
 }

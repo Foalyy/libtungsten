@@ -45,9 +45,9 @@ namespace Error {
     const int MAX_ERROR_NUMBER = 16;
 
     void init();
-    void setHandler(Severity severity, void (*handler)());
+    void setHandler(Severity severity, void (*handler)(Module module, int userModule, Code code));
     void happened(Module module, Code code, Severity severity=Severity::CRITICAL);
-    void happened(int userModule, Code code, Severity severity=Severity::CRITICAL);
+    void happened(int userModule, int code, Severity severity=Severity::CRITICAL);
     unsigned int getNumber();
 
 }

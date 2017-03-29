@@ -17,8 +17,8 @@ namespace Carbide {
 
     // Helper functions
     void init();
-    void warningHandler();
-    void criticalHandler();
+    void warningHandler(Error::Module module, int userModule, Error::Code code);
+    void criticalHandler(Error::Module module, int userModule, Error::Code code);
     inline void initLedR() { GPIO::enableOutput(pinLedR, GPIO::HIGH); }
     inline void setLedR(bool on=true) { GPIO::set(pinLedR, !on); } // Inverted : pin must be LOW to turn the LED on
     inline void initLedG() { GPIO::enableOutput(pinLedG, GPIO::HIGH); }

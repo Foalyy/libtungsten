@@ -81,6 +81,9 @@ namespace AST {
     }
 
     void enableAlarm(Time time, bool relative, void (*handler)(), bool wake) {
+        // Critical section
+        Core::disableInterrupts();
+
         // Set the user handler
         _alarmHandler = handler;
 
@@ -97,9 +100,12 @@ namespace AST {
         
         // Set the alarm time
         // The 32-bit truncate is not a problem as long as the alarm is not more than
-        // ~ 100 days in the future (2^32=4294967296 ms or ~1193 hours or 49.71 days, times 2)
+        // ~ 50 days in the future (2^32=4294967296 ms or ~1193 hours or 49.71 days)
         waitWhileBusy();
         if (relative) {
+            if (time == 1) {
+                time++;
+            }
             time += *(volatile uint32_t*)(BASE + OFFSET_CV);
         }
         (*(volatile uint32_t*)(BASE + OFFSET_AR0)) = (uint32_t)time;
@@ -110,6 +116,9 @@ namespace AST {
         // Enable the module interrupt at the Core level
         Core::setInterruptHandler(Core::Interrupt::AST_ALARM, alarmHandlerWrapper);
         Core::enableInterrupt(Core::Interrupt::AST_ALARM, INTERRUPT_PRIORITY);
+
+        // End of critical section
+        Core::enableInterrupts();
     }
 
     void disableAlarm() {

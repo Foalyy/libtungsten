@@ -280,26 +280,22 @@ namespace GPIO {
         int port = channel / 4; // There are four 8-pin channels in each port. The division int truncate is voluntary.
         int subport = channel - 4 * port; // Equivalent to subport = channel % 4
         const uint32_t REG_BASE = GPIO_BASE + port * PORT_REG_SIZE;
+
+        // For each of the 8 pins in this subport, call the handler if the interrupt is enabled (in IER) and pending (in IFR)
         uint32_t flag = ((volatile RSCT_REG*)(REG_BASE + OFFSET_IFR))->RW & ((volatile RSCT_REG*)(REG_BASE + OFFSET_IER))->RW;
-        flag >>= subport * 8;
-        int pin;
-        for (pin = 0; pin < 8; pin++) {
-            if (flag & 0x01) {
-                break;
+        for (int pin = 0; pin < 8; pin++) {
+            if (flag & (1 << (subport * 8 + pin))) {
+                // Call the user handler for this interrupt
+                void (*handler)() = (void (*)())_interruptHandlers[port * 32 + subport * 8 + pin];
+                if (handler == nullptr) {
+                    Error::happened(Error::Module::GPIO, ERR_HANDLER_NOT_DEFINED, Error::Severity::CRITICAL);
+                } else {
+                    handler();
+                }
+
+                // Clear the interrupt source
+                ((volatile RSCT_REG*)(REG_BASE + OFFSET_IFR))->CLEAR = 1 << (subport * 8 + pin);
             }
-            flag >>= 1;
         }
-        pin += subport * 8;
-
-        // Call the user handler for this interrupt
-        void (*handler)() = (void (*)())_interruptHandlers[port * 32 + pin];
-        if (handler == nullptr) {
-            Error::happened(Error::Module::GPIO, ERR_HANDLER_NOT_DEFINED, Error::Severity::CRITICAL);
-        } else {
-            handler();
-        }
-
-        // Clear the interrupt source
-        ((volatile RSCT_REG*)(REG_BASE + OFFSET_IFR))->CLEAR = 1 << (subport * 8 + pin);
     }
 }

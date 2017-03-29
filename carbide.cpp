@@ -26,7 +26,7 @@ namespace Carbide {
         }
     }
 
-    void warningHandler() {
+    void warningHandler(Error::Module module, int userModule, Error::Code code) {
         setLedR(false);
         Core::sleep(100);
         setLedR();
@@ -39,7 +39,7 @@ namespace Carbide {
         Core::sleep(100);
     }
 
-    void criticalHandler() {
+    void criticalHandler(Error::Module module, int userModule, Error::Code code) {
         while (1) {
             setLedR();
             Core::sleep(100);

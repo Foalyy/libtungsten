@@ -381,7 +381,7 @@ namespace USB {
 
                     // Call the handler to read the packet content
                     if (ep->handlers[static_cast<int>(EPHandlerType::SETUP)] != nullptr) {
-                        ep->handlers[static_cast<int>(EPHandlerType::SETUP)]();
+                        ep->handlers[static_cast<int>(EPHandlerType::SETUP)](0);
                     }
 
                     // Clear interrupt
@@ -392,14 +392,23 @@ namespace USB {
                 } else if (uecon & uesta & (1 << UESTA_RXOUTI)) {
                     addDbgEvent(EV_OUT, i);
 
+                    // Number of bytes received
+                    int receivedPacketSize = _epRAMDescriptors[i * EP_DESCRIPTOR_SIZE + EP_PCKSIZE] & PCKSIZE_BYTE_COUNT_MASK;
+
                     // Call the handler to read the packet content
                     if (ep->handlers[static_cast<int>(EPHandlerType::OUT)] != nullptr) {
-                        ep->handlers[static_cast<int>(EPHandlerType::OUT)]();
+                        ep->handlers[static_cast<int>(EPHandlerType::OUT)](receivedPacketSize);
                     }
 
                     // Clear interrupt
                     (*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR + i * 4))
                         = 1 << UESTA_RXOUTI;
+
+                    // If this is an OUT endpoint, clear FIFOCON to free the bank
+                    if (ep->direction == EPDir::OUT) {
+                        (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0CLR + i * 4))
+                            = 1 << UECON_FIFOCON;
+                    }
 
                     // If this is an IN or No Data transfer, an OUT packet means the transfer is finished or aborted
                     if (_lastSetupPacket.direction == EPDir::IN || _lastSetupPacket.wLength == 0) {
@@ -409,13 +418,17 @@ namespace USB {
                     }
 
                 // IN packet
+                // Note : this is not called when an IN packet is received, but whenever the bank is ready
+                // to receive the content for the next IN packet. This is because the data must be sent 
+                // immediately after the IN packet, with no time for a handler call, and must therefore be
+                // prepared beforehand.
                 } else if (uecon & uesta & (1 << UESTA_TXINI)) {
                     addDbgEvent(EV_IN, i);
 
                     // Call the handler to write the packet content
                     int bytesToSend = 0;
                     if (ep->handlers[static_cast<int>(EPHandlerType::IN)] != nullptr) {
-                        bytesToSend = ep->handlers[static_cast<int>(EPHandlerType::IN)]();
+                        bytesToSend = ep->handlers[static_cast<int>(EPHandlerType::IN)](0);
                     }
                     _epRAMDescriptors[i * EP_DESCRIPTOR_SIZE + EP_PCKSIZE] = bytesToSend;
 
@@ -426,7 +439,8 @@ namespace USB {
                     (*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR + i * 4))
                         = 1 << UESTA_TXINI;
 
-                    // If this is an IN endpoint, clear FIFOCON to send the packet
+                    // If this is an IN endpoint, clear FIFOCON to free the bank and allow the
+                    // hardware to send the data at the next IN packet
                     if (ep->direction == EPDir::IN) {
                         (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0CLR + i * 4))
                             = 1 << UECON_FIFOCON;
@@ -438,7 +452,7 @@ namespace USB {
 
 
     // Handlers for endpoint 0
-    int ep0SETUPHandler() {
+    int ep0SETUPHandler(int unused) {
         // Read received data in bankEP0 and respond accordingly
         //int receivedPacketSize = _epRAMDescriptors[EP_PCKSIZE] & PCKSIZE_BYTE_COUNT_MASK;
         uint8_t* bank = (uint8_t*)_epRAMDescriptors[0];
@@ -490,7 +504,7 @@ namespace USB {
         return 0;
     }
 
-    int ep0INHandler() {
+    int ep0INHandler(int unused) {
         // Behave according to the last SETUP packet received
         if (_setupPacketAvailable) {
 
@@ -648,14 +662,13 @@ namespace USB {
         return 0;
     }
 
-    int ep0OUTHandler() {
+    int ep0OUTHandler(int size) {
         if (_lastSetupPacket.direction == EPDir::IN) {
             // This is an ACK from the host
             _setupPacketAvailable = false;
 
         } else {
-            // This is an OUT packet containing data
-            //int receivedPacketSize = _epRAMDescriptors[EP_PCKSIZE] & PCKSIZE_BYTE_COUNT_MASK;
+            // This is an OUT packet containing data, unused for EP0
 
             // Enable the IN interrupt to ACK this
             (*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR))
@@ -668,7 +681,7 @@ namespace USB {
 
     // Handlers management
     // Set an endpoint handler
-    void setEndpointHandler(Endpoint endpointNumber, EPHandlerType handlerType, int (*handler)()) {
+    void setEndpointHandler(Endpoint endpointNumber, EPHandlerType handlerType, int (*handler)(int)) {
         EndpointConfig* ep = &_endpoints[endpointNumber];
         if (ep->enabled) {
             ep->handlers[static_cast<int>(handlerType)] = handler;
@@ -680,6 +693,25 @@ namespace USB {
         //(*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR + endpointNumber * 4))
         //    = 1 << UESTA_TXINI;
         (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0SET + endpointNumber * 4))
+            = 1 << UECON_TXINE;
+    }
+
+    // Clear the bank of the specified endpoint. This is useful if the bank data was prepared
+    // by an IN handler, but no IN packet was sent by the host yet, and this data is now obsolete
+    void abortINTransfer(Endpoint endpointNumber) {
+        // Kill the bank
+        (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0SET + endpointNumber * 4))
+            = 1 << UECON_KILLBK;
+
+        // Wait for the end of the procedure
+        while ((*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0 + endpointNumber * 4)) & 1 << UECON_KILLBK);
+    }
+
+    // Disable the IN interrupt on the specified endpoint
+    void disableINInterrupt(Endpoint endpointNumber) {
+        //(*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR + endpointNumber * 4))
+        //    = 1 << UESTA_TXINI;
+        (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0CLR + endpointNumber * 4))
             = 1 << UECON_TXINE;
     }
 

@@ -199,6 +199,6 @@ debug-bootloader: halt
 clean: clean-all
 
 clean-all: 
-	rm -f $(NAME).elf $(NAME).map $(NAME).hex *.o $(ROOTDIR)/$(LIBNAME)/*.o $(ROOTDIR)/utils/*.o $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/*.o
+	rm -f $(NAME).elf $(NAME).map $(NAME).hex *.o $(ROOTDIR)/$(LIBNAME)/*.o $(ROOTDIR)/$(LIBNAME)/utils/*.o $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/*.o
 	cd $(ROOTDIR)/$(LIBNAME)/bootloader; rm -f bootloader.elf bootloader.hex *.o
 	cd $(ROOTDIR)/$(LIBNAME)/codeuploader; rm -f codeuploader *.o
