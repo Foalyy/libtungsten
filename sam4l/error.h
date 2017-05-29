@@ -22,7 +22,8 @@ namespace Error {
         USART,
         WDT,
         EIC,
-        USB
+        USB,
+        CUSTOM
     };
 
     using Code = uint16_t;

@@ -22,7 +22,7 @@ namespace EIC {
 
     void setPin(Channel channel, GPIO::Pin pin) {
         PINS[channel] = pin;
-    };
+    }
 
     void init() {
         memset(_interruptHandlers, 0, sizeof(_interruptHandlers));

@@ -109,8 +109,8 @@ namespace SPI {
         }
 
         // SPI mode
-        uint8_t cpol = static_cast<int>(mode) & 0b01;
-        uint8_t ncpha = !(static_cast<int>(mode) & 0b10);
+        uint8_t cpol = static_cast<int>(mode) & 0b10;
+        uint8_t ncpha = !(static_cast<int>(mode) & 0b01);
 
         // CSRn (Chip Select Register n) : configure the slave-specific settings
         (*(volatile uint32_t*)(SPI_BASE + OFFSET_CSR0 + _nSlaves * 0x04))

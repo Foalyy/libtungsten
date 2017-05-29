@@ -36,6 +36,7 @@ namespace DMA {
     const uint8_t ISR_RCZ = 0;
     const uint8_t ISR_TRC = 1;
     const uint8_t ISR_TERR = 2;
+    const uint8_t SR_TEN = 0;
 
     // Error codes
     const Error::Code ERR_NO_CHANNEL_AVAILABLE = 0x0001;
@@ -83,6 +84,11 @@ namespace DMA {
         DAC = 35
     };
 
+    struct ChannelConfig {
+        bool started;
+        bool interruptsEnabled;
+    };
+
     const int N_CHANNELS_MAX = 16;
     const uint8_t INTERRUPT_PRIORITY = 8;
 
@@ -95,6 +101,7 @@ namespace DMA {
     void reloadChannel(int channel, uint32_t address, uint16_t length);
     void stopChannel(int channel);
     int getCounter(int channel);
+    bool isEnabled(int channel);
     bool isFinished(int channel);
     bool isReloadEmpty(int channel);
 

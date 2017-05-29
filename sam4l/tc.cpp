@@ -89,7 +89,7 @@ namespace TC {
 
         // Set the signal period
         unsigned int basePeriod = 80000000L / PM::getModuleClockFrequency(PM::CLK_TC0 + channel.tc);
-        (*(volatile uint32_t*)(REG + OFFSET_RC0)) = period / basePeriod;
+        (*(volatile uint32_t*)(REG + OFFSET_RC0)) = period * 10 / basePeriod;
 
         // Software trigger
         (*(volatile uint32_t*)(REG + OFFSET_CCR0)) = 1 << CCR_SWTRG;

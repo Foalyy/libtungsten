@@ -143,6 +143,6 @@ namespace ADC {
 
     void setPin(Channel channel, GPIO::Pin pin) {
         PINS[channel] = pin;
-    };
+    }
 
 }

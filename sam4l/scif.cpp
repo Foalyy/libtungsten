@@ -299,6 +299,6 @@ namespace SCIF {
                 PINS_GCLK_IN[static_cast<int>(channel)] = pin;
                 break;
         }
-    };
+    }
 
 }

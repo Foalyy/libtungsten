@@ -74,10 +74,10 @@ namespace SPI {
     
     // Static values
     enum class Mode {
-        Mode0 = 0,
-        Mode1 = 1,
-        Mode2 = 2,
-        Mode3 = 3
+        MODE0 = 0, // CPOL=0, CPHA=0
+        MODE1 = 1, // CPOL=0, CPHA=1
+        MODE2 = 2, // CPOL=1, CPHA=0
+        MODE3 = 3  // CPOL=1, CPHA=1
     };
 
     using Slave = uint8_t;
@@ -95,7 +95,7 @@ namespace SPI {
 
     // Module API
     void enableMaster();
-    Slave addSlave(Mode mode=Mode::Mode0);
+    Slave addSlave(Mode mode=Mode::MODE0);
     uint8_t transfer(Slave slave, uint8_t tx=0, bool next=false);
     void transfer(Slave slave, uint8_t* txBuffer, uint8_t* rxBuffer, int size, int sizeRx=-1, bool partial=false);
     void setPin(PinFunction function, GPIO::Pin pin);

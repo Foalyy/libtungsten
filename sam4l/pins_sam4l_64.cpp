@@ -10,7 +10,7 @@
 #include "gloc.h"
 #include "eic.h"
 
-// This file defines the defaukt pin mapping for peripherals.
+// This file defines the default pin mapping for peripherals.
 // Most of the chip peripherals can map their signals on a few different
 // pins. The list of available functions for each pin is defined in the
 // datasheet, §3.2.1 Multiplexed Signals. Use the setPin() functions of
@@ -76,8 +76,8 @@ namespace GLOC {
     };
 
     GPIO::Pin PINS_OUT[] = {
-        {GPIO::Port::A,  8, GPIO::Periph::D}, // GLOC0 OUT0
-        {GPIO::Port::A, 31, GPIO::Periph::D}  // GLOC1 OUT1
+        {GPIO::Port::A,  8, GPIO::Periph::D}, // GLOC0 OUT
+        {GPIO::Port::A, 31, GPIO::Periph::D}  // GLOC1 OUT
     };
 
     // Alternatives for GLOC0
@@ -85,14 +85,14 @@ namespace GLOC {
     //{GPIO::Port::A, 21, GPIO::Periph::D}, // GLOC0 IN1
     //{GPIO::Port::A, 22, GPIO::Periph::D}, // GLOC0 IN2
     //{GPIO::Port::A, 23, GPIO::Periph::D}  // GLOC0 IN3
-    //{GPIO::Port::A, 24, GPIO::Periph::D}, // GLOC0 OUT0
+    //{GPIO::Port::A, 24, GPIO::Periph::D}, // GLOC0 OUT
 
     // Alternatives for GLOC1
     //{GPIO::Port::B,  6, GPIO::Periph::C}, // GLOC1 IN4
     //{GPIO::Port::B,  7, GPIO::Periph::C}, // GLOC1 IN5
     //{GPIO::Port::B,  8, GPIO::Periph::C}, // GLOC1 IN6
     //{GPIO::Port::B,  9, GPIO::Periph::C}  // GLOC1 IN7
-    //{GPIO::Port::B, 10, GPIO::Periph::C}  // GLOC1 OUT1
+    //{GPIO::Port::B, 10, GPIO::Periph::C}  // GLOC1 OUT
 
 }
 

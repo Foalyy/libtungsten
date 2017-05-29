@@ -73,6 +73,6 @@ namespace GLOC {
                 PINS_OUT[static_cast<int>(lut)] = pin;
                 break;
         }
-    };
+    }
 
 }

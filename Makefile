@@ -188,10 +188,10 @@ bootloader:
 
 # Flash the bootloader into the chip using OpenOCD
 flash-bootloader: bootloader
-	echo "reset halt; flash write_image $(DOERASE) unlock $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.hex; reset run; exit" | netcat localhost 4444
+	echo "reset halt; flash write_image erase unlock $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.hex; reset run; exit" | netcat localhost 4444
 
 # Debug the bootloader
-debug-bootloader: halt
+debug-bootloader: pause
 	$(GDB) -ex "set print pretty on" -ex "target extended-remote localhost:3333" $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.elf
 
 ## Cleaning rules

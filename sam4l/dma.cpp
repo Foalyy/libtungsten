@@ -8,6 +8,8 @@ namespace DMA {
     // Current number of channels
     int _nChannels = 0;
 
+    ChannelConfig _channels[N_CHANNELS_MAX];
+
     // Interrupt handlers
     uint32_t _interruptHandlers[N_CHANNELS_MAX][N_INTERRUPTS];
     const int _interruptBits[N_INTERRUPTS] = {ISR_RCZ, ISR_TRC, ISR_TERR};
@@ -20,7 +22,9 @@ namespace DMA {
             return -1;
         }
 
-        const uint32_t REG_BASE = BASE + _nChannels * CHANNEL_REG_SIZE;
+        // Channel number : take the last channel
+        int n = _nChannels;
+        const uint32_t REG_BASE = BASE + n * CHANNEL_REG_SIZE;
 
         // Make sure the clock for the PDCA (Peripheral DMA Controller) is enabled
         PM::enablePeripheralClock(PM::CLK_DMA);
@@ -32,6 +36,8 @@ namespace DMA {
         (*(volatile uint32_t*)(REG_BASE + OFFSET_MARR)) = 0;                                        // Buffer memory address (reload value)
         (*(volatile uint32_t*)(REG_BASE + OFFSET_TCRR)) = 0;                                        // Buffer length (reload value)
         (*(volatile uint32_t*)(REG_BASE + OFFSET_MR)) = (static_cast<int>(size) & 0b11) << MR_SIZE; // Buffer unit size (byte, half-word or word)
+        _channels[n].started = false;
+        _channels[n].interruptsEnabled = false;
 
         // Enable the ring buffer
         if (ring) {
@@ -45,7 +51,7 @@ namespace DMA {
 
         _nChannels++;
 
-        return _nChannels - 1;
+        return n;
     }
 
     void enableInterrupt(int channel, void (*handler)(), Interrupt interrupt) {
@@ -57,8 +63,10 @@ namespace DMA {
                 = 1 << _interruptBits[static_cast<int>(interrupt)];
 
         // Enable the interrupt in the NVIC
-        Core::setInterruptHandler(static_cast<Core::Interrupt>(static_cast<int>(Core::Interrupt::DMA0) + channel), interruptHandlerWrapper);
-        Core::enableInterrupt(static_cast<Core::Interrupt>(static_cast<int>(Core::Interrupt::DMA0) + channel), INTERRUPT_PRIORITY);
+        Core::Interrupt interruptChannel = static_cast<Core::Interrupt>(static_cast<int>(Core::Interrupt::DMA0) + channel);
+        Core::setInterruptHandler(interruptChannel, interruptHandlerWrapper);
+        Core::enableInterrupt(interruptChannel, INTERRUPT_PRIORITY);
+        _channels[channel].interruptsEnabled = true;
     }
 
     void disableInterrupt(int channel, Interrupt interrupt) {
@@ -69,6 +77,7 @@ namespace DMA {
         // If no interrupt is enabled anymore, disable the channel interrupt at the Core level
         if ((*(volatile uint32_t*)(BASE + channel * CHANNEL_REG_SIZE + OFFSET_IMR)) == 0) {
             Core::disableInterrupt(static_cast<Core::Interrupt>(static_cast<int>(Core::Interrupt::DMA0) + channel));
+            _channels[channel].interruptsEnabled = false;
         }
     }
 
@@ -85,6 +94,7 @@ namespace DMA {
         (*(volatile uint32_t*)(REG_BASE + OFFSET_TCR)) = 0;
 
         // Configure and enable this channel
+        _channels[channel].started = start;
         if (start) {
             (*(volatile uint32_t*)(REG_BASE + OFFSET_CR)) = 1 << CR_TEN;  // Enable transfer (as soon as TCR is written > 0)
         } else {
@@ -92,6 +102,12 @@ namespace DMA {
         }
         (*(volatile uint32_t*)(REG_BASE + OFFSET_MAR)) = address;   // Buffer memory address
         (*(volatile uint32_t*)(REG_BASE + OFFSET_TCR)) = length;    // Buffer length
+
+        // Reenable interrupts if necessary
+        if (start && _channels[channel].interruptsEnabled) {
+            Core::Interrupt interruptChannel = static_cast<Core::Interrupt>(static_cast<int>(Core::Interrupt::DMA0) + channel);
+            Core::enableInterrupt(interruptChannel, INTERRUPT_PRIORITY);
+        }
     }
 
     void startChannel(int channel) {
@@ -102,8 +118,15 @@ namespace DMA {
         }
 
         // Enable this channel
+        _channels[channel].started = true;
         const uint32_t REG_BASE = BASE + channel * CHANNEL_REG_SIZE;
         (*(volatile uint32_t*)(REG_BASE + OFFSET_CR)) = 1 << CR_TEN;    // Enable transfer
+
+        // Reenable interrupts if necessary
+        if (_channels[channel].interruptsEnabled) {
+            Core::Interrupt interruptChannel = static_cast<Core::Interrupt>(static_cast<int>(Core::Interrupt::DMA0) + channel);
+            Core::enableInterrupt(interruptChannel, INTERRUPT_PRIORITY);
+        }
     }
 
     void reloadChannel(int channel, uint32_t address, uint16_t length) {
@@ -117,6 +140,12 @@ namespace DMA {
         const uint32_t REG_BASE = BASE + channel * CHANNEL_REG_SIZE;
         (*(volatile uint32_t*)(REG_BASE + OFFSET_MARR)) = address;  // Buffer memory address
         (*(volatile uint32_t*)(REG_BASE + OFFSET_TCRR)) = length;   // Buffer length
+
+        // Reenable interrupts if necessary
+        if (_channels[channel].interruptsEnabled) {
+            Core::Interrupt interruptChannel = static_cast<Core::Interrupt>(static_cast<int>(Core::Interrupt::DMA0) + channel);
+            Core::enableInterrupt(interruptChannel, INTERRUPT_PRIORITY);
+        }
     }
 
     void stopChannel(int channel) {
@@ -128,14 +157,26 @@ namespace DMA {
         
         const uint32_t REG_BASE = BASE + channel * CHANNEL_REG_SIZE;
 
-        // Empty TCR and disable transfer
-        (*(volatile uint32_t*)(REG_BASE + OFFSET_TCR)) = 0;
+        // Disable the channel interrupt line, it will be reenabled when the channel is started again
+        if (_channels[channel].interruptsEnabled) {
+            Core::Interrupt interruptChannel = static_cast<Core::Interrupt>(static_cast<int>(Core::Interrupt::DMA0) + channel);
+            Core::disableInterrupt(interruptChannel);
+        }
+
+        // Disable transfer and empty TCR
+        _channels[channel].started = false;
         (*(volatile uint32_t*)(REG_BASE + OFFSET_CR)) = 1 << CR_TDIS;
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_TCR)) = 0;
     }
 
     int getCounter(int channel) {
         // TCR : Transfer Counter Register
         return (*(volatile uint32_t*)(BASE + channel * CHANNEL_REG_SIZE + OFFSET_TCR));
+    }
+
+    bool isEnabled(int channel) {
+        // SR : Status Register
+        return (*(volatile uint32_t*)(BASE + channel * CHANNEL_REG_SIZE + OFFSET_SR)) & (1 << SR_TEN);
     }
 
     bool isFinished(int channel) {
@@ -151,11 +192,12 @@ namespace DMA {
     void interruptHandlerWrapper() {
         // Get the channel number through the current interrupt number
         int channel = static_cast<int>(Core::currentInterrupt()) - static_cast<int>(Core::Interrupt::DMA0);
+        const uint32_t REG_BASE = BASE + channel * CHANNEL_REG_SIZE;
 
         // Call the user handler of every interrupt that is enabled and pending
         for (int i = 0; i < N_INTERRUPTS; i++) {
-            if ((*(volatile uint32_t*)(BASE + channel * CHANNEL_REG_SIZE + OFFSET_IMR)) & (1 << _interruptBits[i]) // Interrupt is enabled
-                    && (*(volatile uint32_t*)(BASE + channel * CHANNEL_REG_SIZE + OFFSET_ISR)) & (1 << _interruptBits[i])) { // Interrupt is pending
+            if ((*(volatile uint32_t*)(REG_BASE + OFFSET_IMR)) & (1 << _interruptBits[i]) // Interrupt is enabled
+                    && (*(volatile uint32_t*)(REG_BASE + OFFSET_ISR)) & (1 << _interruptBits[i])) { // Interrupt is pending
                 void (*handler)() = (void (*)())_interruptHandlers[channel][i];
                 if (handler != nullptr) {
                     handler();

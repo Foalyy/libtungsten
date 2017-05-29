@@ -77,6 +77,7 @@ int main(int argc, char** argv) {
         }
         sendRequest(CONNECT);
         waitReady();
+        cout << "Connected to bootloader" << endl;
 
     } else {
         // Serial

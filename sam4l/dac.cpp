@@ -139,6 +139,6 @@ namespace DAC {
 
     void setPin(GPIO::Pin pin) {
         PIN_VOUT = pin;
-    };
+    }
 
 }

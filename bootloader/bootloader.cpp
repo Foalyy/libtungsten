@@ -10,6 +10,11 @@
 #include <wdt.h>
 #include <string.h>
 
+// This is the bootloader for the libtungsten library. It can be configured to either open an
+// UART (serial) port or to connect via USB, and to be activated with an external input (such
+// as another microcontroller or a button) and/or a timeout. Most of the behaviour can be customized
+// to your liking.
+
 
 // Configuration
 const bool MODE_INPUT = true;
@@ -17,9 +22,9 @@ const bool MODE_TIMEOUT = true;
 const bool CHANNEL_USART = false;
 const bool CHANNEL_USB = true;
 const bool _ledsEnabled = true;
-const GPIO::Pin PIN_LED_BL {GPIO::Port::A, 1}; // Green led on Carbide
+const GPIO::Pin PIN_LED_BL {GPIO::Port::A, 0}; // Green led on Carbide
 const GPIO::Pin PIN_LED_WRITE {GPIO::Port::A, 2}; // Blue led on Carbide
-const GPIO::Pin PIN_LED_ERROR {GPIO::Port::A, 0}; // Red led on Carbide
+const GPIO::Pin PIN_LED_ERROR {GPIO::Port::A, 1}; // Red led on Carbide
 const GPIO::Pin PIN_BUTTON {GPIO::Port::A, 4}; // For INPUT mode
 const unsigned int TIMEOUT_DELAY = 3000; // ms; for TIMEOUT mode
 const USART::Port USART_PORT = USART::Port::USART1;
@@ -42,7 +47,7 @@ enum class Status {
 };
 
 // USB error codes (Device -> Host)
-enum class Error {
+enum class BLError {
     NONE,
     CHECKSUM,
     PROTECTED_AREA,
@@ -70,7 +75,7 @@ bool _bufferFull = false;
 volatile Status _status = Status::READY;
 volatile bool _exitBootloader = false;
 volatile bool _connected = false;
-volatile Error _error = Error::NONE;
+volatile BLError _error = BLError::NONE;
 volatile Channel _activeChannel = Channel::NONE;
 volatile Mode _activeMode = Mode::NONE;
 
@@ -181,7 +186,7 @@ int main() {
         }
 
 
-        uint8_t pageBuffer[Flash::FLASH_PAGE_SIZE];
+        uint8_t pageBuffer[Flash::FLASH_PAGE_SIZE_BYTES];
         int currentPage = -1;
         int frameCounter = 0;
         memset(pageBuffer, 0, BUFFER_SIZE);
@@ -255,8 +260,8 @@ int main() {
                     int nBytes = parseHex(_buffer, cursor, 2);
                     cursor += 2;
                     uint16_t addr = parseHex(_buffer, cursor, 4);
-                    int page = addr / Flash::FLASH_PAGE_SIZE;
-                    int offset = addr % Flash::FLASH_PAGE_SIZE;
+                    int page = addr / Flash::FLASH_PAGE_SIZE_BYTES;
+                    int offset = addr % Flash::FLASH_PAGE_SIZE_BYTES;
                     cursor += 4;
                     uint8_t command = parseHex(_buffer, cursor, 2);
                     cursor += 2;
@@ -271,7 +276,7 @@ int main() {
                     if (s != checksum) {
                         // Error
                         _status = Status::ERROR;
-                        _error = Error::CHECKSUM;
+                        _error = BLError::CHECKSUM;
                         if (_ledsEnabled) {
                             GPIO::set(PIN_LED_ERROR, false);
                         }
@@ -287,7 +292,7 @@ int main() {
                         if (page < BOOTLOADER_N_FLASH_PAGES) {
                             // Error
                             _status = Status::ERROR;
-                            _error = Error::PROTECTED_AREA;
+                            _error = BLError::PROTECTED_AREA;
                             if (_ledsEnabled) {
                                 GPIO::set(PIN_LED_ERROR, false);
                             }
@@ -304,14 +309,14 @@ int main() {
                                     GPIO::set(PIN_LED_WRITE, false);
                                 }
                                 // Write the previous page
-                                Flash::writePage(currentPage, pageBuffer);
+                                Flash::writePage(currentPage, (uint32_t*)pageBuffer);
                                 if (_ledsEnabled) {
                                     GPIO::set(PIN_LED_WRITE, true);
                                 }
                             }
                             // Reset page buffer
                             currentPage = page;
-                            memset(pageBuffer, 0, Flash::FLASH_PAGE_SIZE);
+                            memset(pageBuffer, 0, Flash::FLASH_PAGE_SIZE_BYTES);
                         }
 
                         // Save data
@@ -324,7 +329,7 @@ int main() {
                         if (_ledsEnabled) {
                             GPIO::set(PIN_LED_WRITE, false);
                         }
-                        Flash::writePage(currentPage, pageBuffer);
+                        Flash::writePage(currentPage, (uint32_t*)pageBuffer);
                         if (_ledsEnabled) {
                             GPIO::set(PIN_LED_WRITE, true);
                         }
@@ -354,8 +359,9 @@ int main() {
 
     } else {
         // Execute the user code
-        uint32_t userResetHandlerAddress = (*(volatile uint32_t*)(BOOTLOADER_N_FLASH_PAGES * Flash::FLASH_PAGE_SIZE + 0x04));
+        uint32_t userResetHandlerAddress = (*(volatile uint32_t*)(BOOTLOADER_N_FLASH_PAGES * Flash::FLASH_PAGE_SIZE_BYTES + 0x04));
         void (*userResetHandler)() = (void (*)())(userResetHandlerAddress);
         userResetHandler();
+        //while (1);
     }
 }
