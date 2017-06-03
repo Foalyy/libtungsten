@@ -1,4 +1,5 @@
 #include "i2c.h"
+#include "core.h"
 #include "pm.h"
 #include "dma.h"
 #include "error.h"
@@ -15,14 +16,20 @@ namespace I2C {
     struct Channel {
         Mode mode = Mode::NONE;
         uint8_t buffer[BUFFER_SIZE];
-        int rxDMAChannel;
-        int txDMAChannel;
+        int rxDMAChannel = -1;
+        int txDMAChannel = -1;
         unsigned int nBytesToRead = 0;
         unsigned int nBytesToWrite = 0;
     };
 
     // List of available ports
     struct Channel ports[N_PORTS_M];
+
+    // Interrupt handlers
+    uint32_t _interruptHandlers[N_PORTS_M][N_INTERRUPTS];
+    Core::Interrupt _interruptChannelsMaster[] = {Core::Interrupt::TWIM0, Core::Interrupt::TWIM1, Core::Interrupt::TWIM2, Core::Interrupt::TWIM3};
+    Core::Interrupt _interruptChannelsSlave[] = {Core::Interrupt::TWIS0, Core::Interrupt::TWIS1};
+    void interruptHandlerWrapper();
 
     // Clocks
     const int PM_CLK_M[] = {PM::CLK_I2CM0, PM::CLK_I2CM1, PM::CLK_I2CM2, PM::CLK_I2CM3}; // Master mode
@@ -57,6 +64,10 @@ namespace I2C {
         // Free the pins in peripheral mode
         GPIO::disablePeripheral(PINS_SDA[static_cast<int>(port)]);
         GPIO::disablePeripheral(PINS_SCL[static_cast<int>(port)]);
+
+        // Stop the DMA channels
+        DMA::stopChannel(p->txDMAChannel);
+        DMA::stopChannel(p->rxDMAChannel);
 
         if (p->mode == Mode::MASTER) {
             // CR (Control Register) : disable the master interface
@@ -131,10 +142,14 @@ namespace I2C {
             | 2 << M_SRR_FILTER;
 
         // Set up the DMA channels and related interrupts
-        p->rxDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_M_RX) + static_cast<int>(port)), 
-                (uint32_t)(p->buffer), BUFFER_SIZE, DMA::Size::BYTE);
-        p->txDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_M_TX) + static_cast<int>(port)),
-                (uint32_t)(p->buffer), BUFFER_SIZE, DMA::Size::BYTE);
+        if (p->rxDMAChannel == -1) {
+            p->rxDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_M_RX) + static_cast<int>(port)), 
+                    (uint32_t)(p->buffer), BUFFER_SIZE, DMA::Size::BYTE);
+        }
+        if (p->txDMAChannel == -1) {
+            p->txDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_M_TX) + static_cast<int>(port)),
+                    (uint32_t)(p->buffer), BUFFER_SIZE, DMA::Size::BYTE);
+        }
 
         return true;
     }
@@ -218,8 +233,8 @@ namespace I2C {
     // Master functions
 
     // Internal function which checks if the controller has lost the bus arbitration
-    // to another master. If no other master is present and this condition arrises, 
-    // this may be the sign of an electrical problem (short circuit), so check the wires.
+    // to another master. If no other master is present and this condition arises, 
+    // this may be the sign of an electrical problem (short circuit or missing pull-ups).
     bool checkArbitrationLost(Port port) {
         struct Channel* p = &(ports[static_cast<int>(port)]);
         if (p->mode != Mode::MASTER) {
@@ -228,7 +243,7 @@ namespace I2C {
         }
 
         const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
-        if ((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) >> M_SR_ARBLST & 1) {
+        if ((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ARBLST)) {
             Error::happened(Error::Module::I2C, WARN_ARBITRATION_LOST, Error::Severity::WARNING);
             reset(port);
             (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CMDR)) = 0;
@@ -247,7 +262,9 @@ namespace I2C {
             return false;
         }
         const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
-        checkArbitrationLost(port);
+        if (checkArbitrationLost(port)) {
+            return false;
+        }
 
         // CMDR (Command Register) : initiate a transfer
         (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CMDR))
@@ -258,12 +275,17 @@ namespace I2C {
             | 1 << M_CMDR_VALID
             | 0 << M_CMDR_NBYTES;
 
-        // Wait for the transfer to complete
-        while (!((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) >> M_SR_IDLE & 1));
+        // Wait for the transfer to complete or an Arbitration lost condition to happen
+        while (!( (*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_IDLE)
+            || (*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ARBLST) ));
+
+        // Check for arbitration lost again now that the transfer is complete
+        if (checkArbitrationLost(port)) {
+            return false;
+        }
 
         // If the ANAK status flag is set, no slave has answered
-        if ((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) >> M_SR_ANAK & 1
-            || (*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) >> M_SR_ARBLST & 1) {
+        if ((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ANAK)) {
 
             // Clear the ANAK status flag and the command register
             (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CMDR)) = 0;
@@ -283,7 +305,9 @@ namespace I2C {
             return 0;
         }
         const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
-        checkArbitrationLost(port);
+        if (checkArbitrationLost(port)) {
+            return 0;
+        }
 
         // Clear every status
         (*(volatile uint32_t*)(REG_BASE + OFFSET_M_SCR)) = 0xFFFFFFFF;
@@ -302,7 +326,12 @@ namespace I2C {
 
         // Wait for the transfer to be finished
         while (!DMA::isFinished(p->rxDMAChannel)
-            && !((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ANAK | 1 << M_SR_DNAK)));
+            && !((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ANAK | 1 << M_SR_DNAK | 1 << M_SR_ARBLST)));
+
+        // Check for arbitration lost again now that the transfer is complete
+        if (checkArbitrationLost(port)) {
+            return false;
+        }
 
         // If the slave has not responded, cancel the read
         if ((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & 1 << M_SR_ANAK) {
@@ -329,7 +358,9 @@ namespace I2C {
             return false;
         }
         const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
-        checkArbitrationLost(port);
+        if (checkArbitrationLost(port)) {
+            return false;
+        }
 
         // Write at most BUFFER_SIZE characters
         if (n >  BUFFER_SIZE) {
@@ -364,10 +395,15 @@ namespace I2C {
         // Wait for the transfer to be finished
         if (n >= 2) {
             while (!(DMA::isFinished(p->txDMAChannel) && (*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_BUSFREE))
-                && !((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ANAK | 1 << M_SR_DNAK)));
+                && !((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ANAK | 1 << M_SR_DNAK | 1 << M_SR_ARBLST)));
 
         } else {
-            while (!((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) >> M_SR_IDLE & 1));
+            while (!((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_IDLE)));
+        }
+
+        // Check for arbitration lost again now that the transfer is complete
+        if (checkArbitrationLost(port)) {
+            return false;
         }
 
         // Return true if the transfer was completed successfully
@@ -379,7 +415,7 @@ namespace I2C {
         return write(port, address, &byte, 1);
     }
 
-    // Write then immediatly read on the bus on the same transfer, with a Repeated Start condition.
+    // Write then immediately read on the bus on the same transfer, with a Repeated Start condition.
     // This is especially useful for reading registers on devices by writing the register address
     // then reading the value
     bool writeRead(Port port, uint8_t address, const uint8_t* txBuffer, int nTX, uint8_t* rxBuffer, int nRX) {
@@ -389,7 +425,9 @@ namespace I2C {
             return false;
         }
         const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
-        checkArbitrationLost(port);
+        if (checkArbitrationLost(port)) {
+            return false;
+        }
 
         // Write at most BUFFER_SIZE characters
         if (nTX >  BUFFER_SIZE) {
@@ -435,7 +473,12 @@ namespace I2C {
 
         // Wait for the transfer to be finished
         while (!DMA::isFinished(p->rxDMAChannel)
-            && !((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ANAK | 1 << M_SR_DNAK)));
+            && !((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ANAK | 1 << M_SR_DNAK | 1 << M_SR_ARBLST)));
+
+        // Check for arbitration lost again now that the transfer is complete
+        if (checkArbitrationLost(port)) {
+            return false;
+        }
 
         // If the slave has not responded, cancel the read
         if ((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & 1 << M_SR_ANAK) {
@@ -542,7 +585,7 @@ namespace I2C {
             // Wait for the transfer to be finished
             while (!((*(volatile uint32_t*)(REG_BASE + OFFSET_S_SR)) & (1 << S_SR_TCOMP | 1 << S_SR_BUSERR | 1 << S_SR_NAK)));
 
-            return DMA::isFinished(p->rxDMAChannel);
+            return DMA::isFinished(p->txDMAChannel);
         }
     }
 
@@ -592,6 +635,61 @@ namespace I2C {
             return p->nBytesToWrite - DMA::getCounter(p->txDMAChannel);
         }
         return 0;
+    }
+
+    void enableInterrupt(Port port, void (*handler)(), Interrupt interrupt) {
+        const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
+        struct Channel* p = &(ports[static_cast<int>(port)]);
+        if (p->mode != Mode::SLAVE) {
+            Error::happened(Error::Module::I2C, ERR_PORT_NOT_INITIALIZED, Error::Severity::CRITICAL);
+            return;
+        }
+
+        // Save the user handler
+        _interruptHandlers[static_cast<int>(port)][static_cast<int>(interrupt)] = (uint32_t)handler;
+
+        // IER (Interrupt Enable Register) : enable the requested interrupt
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_IER))
+                = 1 << S_SR_TCOMP;
+
+        // Enable the interrupt in the NVIC
+        Core::Interrupt interruptChannel;
+        if (p->mode == Mode::MASTER) {
+            interruptChannel = _interruptChannelsMaster[static_cast<int>(port)];
+        } else {
+            interruptChannel = _interruptChannelsSlave[static_cast<int>(port)];
+        }
+        Core::setInterruptHandler(interruptChannel, interruptHandlerWrapper);
+        Core::enableInterrupt(interruptChannel, INTERRUPT_PRIORITY);
+    }
+
+    void interruptHandlerWrapper() {
+        // Get the port through the current interrupt number
+        Port port;
+        Core::Interrupt currentInterrupt = Core::currentInterrupt();
+        if (currentInterrupt == Core::Interrupt::TWIS0) {
+            port = Port::I2C0;
+        } else if (currentInterrupt == Core::Interrupt::TWIS1) {
+            port = Port::I2C1;
+        } else {
+            return;
+        }
+        const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
+
+        // Call the user handler for this interrupt
+        void (*handler)() = nullptr;
+        if ((*(volatile uint32_t*)(REG_BASE + OFFSET_S_SR)) & (1 << S_SR_TRA)) {
+            handler = (void (*)())_interruptHandlers[static_cast<int>(port)][static_cast<int>(Interrupt::ASYNC_WRITE_FINISHED)];
+        } else {
+            handler = (void (*)())_interruptHandlers[static_cast<int>(port)][static_cast<int>(Interrupt::ASYNC_READ_FINISHED)];
+        }
+        if (handler != nullptr) {
+            handler();
+        }
+
+        // SCR (Status Clear Register) : clear the interrupt
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_SCR))
+                = 1 << S_SR_TCOMP;
     }
 
     // Advanced function which returns the raw Status Register.

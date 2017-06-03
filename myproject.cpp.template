@@ -13,5 +13,5 @@ int main() {
     // Running loop
     while (1) {
         // Your program goes there!
-    };
+    }
 }

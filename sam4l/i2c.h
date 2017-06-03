@@ -155,10 +155,19 @@ namespace I2C {
         SCL
     };
 
+    // Interrupts
+    const int N_INTERRUPTS = 2;
+    enum class Interrupt {
+        ASYNC_READ_FINISHED,
+        ASYNC_WRITE_FINISHED,
+    };
+
     // Error codes
     const Error::Code WARN_PORT_ALREADY_INITIALIZED = 1;
     const Error::Code WARN_ARBITRATION_LOST = 2;
     const Error::Code ERR_PORT_NOT_INITIALIZED = 3;
+
+    const uint8_t INTERRUPT_PRIORITY = 8;
 
 
     // Common functions
@@ -184,6 +193,7 @@ namespace I2C {
     bool isAsyncWriteFinished(Port port);
     int getAsyncReadCounter(Port port);
     int getAsyncWriteCounter(Port port);
+    void enableInterrupt(Port port, void (*handler)(), Interrupt interrupt);
 
 }
 
