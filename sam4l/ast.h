@@ -63,6 +63,7 @@ namespace AST {
     inline Time time() { return _currentTimeHighBytes + (*(volatile uint32_t*)(BASE + OFFSET_CV)); };
     void enableAlarm(Time time, bool relative=false, void (*handler)()=nullptr, bool wake=true);
     void disableAlarm();
+    bool alarmPassed();
 
 }
 

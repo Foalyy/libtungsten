@@ -94,35 +94,38 @@ namespace AST {
                     = 1 << SR_ALARM0;
         }
 
+        // IDR (Interrupt Disable Register) : disable the Alarm interrupt
+        (*(volatile uint32_t*)(BASE + OFFSET_IDR)) = 1 << SR_ALARM0;
+
+        // Reset the alarm time
+        (*(volatile uint32_t*)(BASE + OFFSET_AR0)) = 0;
+
         // SCR (Status Clear Register) : clear the interrupt
         waitWhileBusy();
         (*(volatile uint32_t*)(BASE + OFFSET_SCR)) = 1 << SR_ALARM0;
         
-        // Set the alarm time
-        // The 32-bit truncate is not a problem as long as the alarm is not more than
-        // ~ 50 days in the future (2^32=4294967296 ms or ~1193 hours or 49.71 days)
-        waitWhileBusy();
-        if (relative) {
-            if (time == 1) {
-                time++;
-            }
-            time += *(volatile uint32_t*)(BASE + OFFSET_CV);
-        }
-        (*(volatile uint32_t*)(BASE + OFFSET_AR0)) = (uint32_t)time;
-
         // IER (Interrupt Enable Register) : enable the Alarm interrupt
         (*(volatile uint32_t*)(BASE + OFFSET_IER)) = 1 << SR_ALARM0;
 
         // Enable the module interrupt at the Core level
         Core::setInterruptHandler(Core::Interrupt::AST_ALARM, alarmHandlerWrapper);
         Core::enableInterrupt(Core::Interrupt::AST_ALARM, INTERRUPT_PRIORITY);
+        
+        // Set the alarm time
+        // The 32-bit truncate is not a problem as long as the alarm is not more than
+        // ~ 50 days in the future (2^32=4294967296 ms or ~1193 hours or 49.71 days)
+        waitWhileBusy();
+        if (relative) {
+            time += *(volatile uint32_t*)(BASE + OFFSET_CV) + 1;
+        }
+        (*(volatile uint32_t*)(BASE + OFFSET_AR0)) = (uint32_t)time;
 
         // End of critical section
         Core::enableInterrupts();
     }
 
     void disableAlarm() {
-        // IER (Interrupt Disable Register) : disable the Alarm interrupt
+        // IDR (Interrupt Disable Register) : disable the Alarm interrupt
         (*(volatile uint32_t*)(BASE + OFFSET_IDR)) = 1 << SR_ALARM0;
     }
 
@@ -148,6 +151,10 @@ namespace AST {
         // SCR (Status Clear Register) : clear the interrupt
         waitWhileBusy();
         (*(volatile uint32_t*)(BASE + OFFSET_SCR)) = 1 << SR_ALARM0;
+    }
+
+    bool alarmPassed() {
+        return *(volatile uint32_t*)(BASE + OFFSET_CV) >= *(volatile uint32_t*)(BASE + OFFSET_AR0);
     }
 
 }

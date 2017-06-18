@@ -78,24 +78,27 @@ namespace ADC {
     }
 
     // Read the current raw value measured by the ADC on the given channel
-    int readRaw(Channel channel, Gain gain) {
-        // Enable this channel if it is not already
+    int readRaw(Channel channel, Gain gain, Channel relativeTo) {
+        // Enable the channels if they are not already
         if (!(_enabledChannels & 1 << channel)) {
             enable(channel);
+        }
+        if (relativeTo != 0xFF && !(_enabledChannels & 1 << relativeTo)) {
+            enable(relativeTo);
         }
 
         // SEQCFG (Sequencer Configuration Register) : setup the conversion
         (*(volatile uint32_t*)(ADC_BASE + OFFSET_SEQCFG))
-            = 0 << SEQCFG_HWLA                        // HWLA : Half Word Left Adjust disabled
-            | 0 << SEQCFG_BIPOLAR                     // BIPOLAR : single-ended mode
-            | static_cast<int>(gain) << SEQCFG_GAIN   // GAIN : user-selected gain
-            | 1 << SEQCFG_GCOMP                       // GCOMP : gain error reduction enabled
-            | 0b000 << SEQCFG_TRGSEL                  // TRGSEL : software trigger
-            | 0 << SEQCFG_RES                         // RES : 12-bits resolution
-            | 0b10 << SEQCFG_INTERNAL                 // INTERNAL : POS external, NEG internal
-            | (channel & 0b1111) << SEQCFG_MUXPOS     // MUXPOS : selected channel
-            | 0b111 << SEQCFG_MUXNEG                  // MUXNEG : pad ground
-            | 0b000 << SEQCFG_ZOOMRANGE;              // ZOOMRANGE : default
+            = 0 << SEQCFG_HWLA                                                    // HWLA : Half Word Left Adjust disabled
+            | (relativeTo != 0xFF) << SEQCFG_BIPOLAR                              // BIPOLAR : single-ended or bipolar mode
+            | static_cast<int>(gain) << SEQCFG_GAIN                               // GAIN : user-selected gain
+            | 1 << SEQCFG_GCOMP                                                   // GCOMP : gain error reduction enabled
+            | 0b000 << SEQCFG_TRGSEL                                              // TRGSEL : software trigger
+            | 0 << SEQCFG_RES                                                     // RES : 12-bit resolution
+            | (relativeTo != 0xFF ? 0b00 : 0b10) << SEQCFG_INTERNAL               // INTERNAL : POS external, NEG internal or external
+            | (channel & 0b1111) << SEQCFG_MUXPOS                                 // MUXPOS : selected channel
+            | (relativeTo != 0xFF ? relativeTo & 0b111 : 0b111) << SEQCFG_MUXNEG  // MUXNEG : pad ground
+            | 0b000 << SEQCFG_ZOOMRANGE;                                          // ZOOMRANGE : default
 
         // CR (Control Register) : start conversion
         (*(volatile uint32_t*)(ADC_BASE + OFFSET_CR))
@@ -112,8 +115,8 @@ namespace ADC {
     }
 
     // Return the current value on the given channel in mV
-    int read(Channel channel, Gain gain) {
-        uint32_t value = readRaw(channel, gain);
+    int read(Channel channel, Gain gain, Channel relativeTo) {
+        int value = readRaw(channel, gain, relativeTo);
 
         // Compute reference
         int vref = _vref;
@@ -126,14 +129,21 @@ namespace ADC {
         }
 
         // Convert the result to mV
-        // value = voltage * gain * 4095 * ref
-        // <=> voltage = value * ref / (gain * 4095)
+        // Single-ended : value = gain * voltage / ref * 4095 <=> voltage = value * ref / (gain * 4095)
+        // Differential : value = 2047 + gain * voltage / ref * 2047 <=> voltage = (value - 2047) * ref / (gain * 2047)
+        if (relativeTo != 0xFF) {
+            value -= 2047;
+        }
         int gainCoefficients[] = {1, 2, 4, 8, 16, 32, 64};
         if (gain == Gain::X05) {
             value *= 2;
         }
         value *= vref;
-        value /= 4095;
+        if (relativeTo != 0xFF) {
+            value /= 2047;
+        } else {
+            value /= 4095;
+        }
         if (gain != Gain::X05) {
             value /= gainCoefficients[static_cast<int>(gain)];
         }
