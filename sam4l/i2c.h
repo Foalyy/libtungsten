@@ -155,6 +155,9 @@ namespace I2C {
         SCL
     };
 
+    // Timeout
+    const int TIMEOUT = 3000; // ms
+
     // Interrupts
     const int N_INTERRUPTS = 2;
     enum class Interrupt {
@@ -166,6 +169,7 @@ namespace I2C {
     const Error::Code WARN_PORT_ALREADY_INITIALIZED = 1;
     const Error::Code WARN_ARBITRATION_LOST = 2;
     const Error::Code ERR_PORT_NOT_INITIALIZED = 3;
+    const Error::Code ERR_TIMEOUT = 4;
 
     const uint8_t INTERRUPT_PRIORITY = 8;
 

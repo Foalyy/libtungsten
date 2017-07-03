@@ -78,7 +78,7 @@ namespace ADC {
     }
 
     // Read the current raw value measured by the ADC on the given channel
-    int readRaw(Channel channel, Gain gain, Channel relativeTo) {
+    uint16_t readRaw(Channel channel, Gain gain, Channel relativeTo) {
         // Enable the channels if they are not already
         if (!(_enabledChannels & 1 << channel)) {
             enable(channel);
@@ -97,7 +97,7 @@ namespace ADC {
             | 0 << SEQCFG_RES                                                     // RES : 12-bit resolution
             | (relativeTo != 0xFF ? 0b00 : 0b10) << SEQCFG_INTERNAL               // INTERNAL : POS external, NEG internal or external
             | (channel & 0b1111) << SEQCFG_MUXPOS                                 // MUXPOS : selected channel
-            | (relativeTo != 0xFF ? relativeTo & 0b111 : 0b111) << SEQCFG_MUXNEG  // MUXNEG : pad ground
+            | (relativeTo != 0xFF ? relativeTo & 0b111 : 0b111) << SEQCFG_MUXNEG  // MUXNEG : pad ground or neg channel
             | 0b000 << SEQCFG_ZOOMRANGE;                                          // ZOOMRANGE : default
 
         // CR (Control Register) : start conversion

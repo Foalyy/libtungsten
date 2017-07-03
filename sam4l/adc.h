@@ -88,7 +88,7 @@ namespace ADC {
     void init(AnalogReference analogReference=AnalogReference::VCC_OVER_2, int vref=3300);
     void enable(Channel channel);
     void disable(Channel channel);
-    int readRaw(Channel channel, Gain gain=Gain::X05, Channel relativeTo=0xFF);
+    uint16_t readRaw(Channel channel, Gain gain=Gain::X05, Channel relativeTo=0xFF);
     int read(Channel channel, Gain gain=Gain::X05, Channel relativeTo=0xFF);
     void setPin(Channel channel, GPIO::Pin pin);
 

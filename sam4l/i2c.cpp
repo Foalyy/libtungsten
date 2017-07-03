@@ -276,8 +276,14 @@ namespace I2C {
             | 0 << M_CMDR_NBYTES;
 
         // Wait for the transfer to complete or an Arbitration lost condition to happen
+        Core::Time t0 = Core::time();
         while (!( (*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_IDLE)
-            || (*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ARBLST) ));
+                || (*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ARBLST) )) {
+            if (Core::time() > t0 + TIMEOUT) {
+                Error::happened(Error::Module::I2C, ERR_TIMEOUT, Error::Severity::CRITICAL);
+            }
+            Core::sleep(1);
+        }
 
         // Check for arbitration lost again now that the transfer is complete
         if (checkArbitrationLost(port)) {
@@ -325,8 +331,14 @@ namespace I2C {
             | n << M_CMDR_NBYTES;
 
         // Wait for the transfer to be finished
+        Core::Time t0 = Core::time();
         while (!DMA::isFinished(p->rxDMAChannel)
-            && !((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ANAK | 1 << M_SR_DNAK | 1 << M_SR_ARBLST)));
+                && !((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ANAK | 1 << M_SR_DNAK | 1 << M_SR_ARBLST))) {
+            if (Core::time() > t0 + TIMEOUT) {
+                Error::happened(Error::Module::I2C, ERR_TIMEOUT, Error::Severity::CRITICAL);
+            }
+            Core::sleep(1);
+        }
 
         // Check for arbitration lost again now that the transfer is complete
         if (checkArbitrationLost(port)) {
@@ -394,11 +406,23 @@ namespace I2C {
 
         // Wait for the transfer to be finished
         if (n >= 2) {
+            Core::Time t0 = Core::time();
             while (!(DMA::isFinished(p->txDMAChannel) && (*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_BUSFREE))
-                && !((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ANAK | 1 << M_SR_DNAK | 1 << M_SR_ARBLST)));
+                    && !((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ANAK | 1 << M_SR_DNAK | 1 << M_SR_ARBLST))) {
+                if (Core::time() > t0 + TIMEOUT) {
+                    Error::happened(Error::Module::I2C, ERR_TIMEOUT, Error::Severity::CRITICAL);
+                }
+                Core::sleep(1);
+            }
 
         } else {
-            while (!((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_IDLE)));
+            Core::Time t0 = Core::time();
+            while (!((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_IDLE))) {
+                if (Core::time() > t0 + TIMEOUT) {
+                    Error::happened(Error::Module::I2C, ERR_TIMEOUT, Error::Severity::CRITICAL);
+                }
+                Core::sleep(1);
+            }
         }
 
         // Check for arbitration lost again now that the transfer is complete
@@ -472,8 +496,14 @@ namespace I2C {
             | nRX << M_CMDR_NBYTES;
 
         // Wait for the transfer to be finished
+        Core::Time t0 = Core::time();
         while (!DMA::isFinished(p->rxDMAChannel)
-            && !((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ANAK | 1 << M_SR_DNAK | 1 << M_SR_ARBLST)));
+                && !((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ANAK | 1 << M_SR_DNAK | 1 << M_SR_ARBLST))) {
+            if (Core::time() > t0 + TIMEOUT) {
+                Error::happened(Error::Module::I2C, ERR_TIMEOUT, Error::Severity::CRITICAL);
+            }
+            Core::sleep(1);
+        }
 
         // Check for arbitration lost again now that the transfer is complete
         if (checkArbitrationLost(port)) {
@@ -526,7 +556,13 @@ namespace I2C {
 
         } else {
             // Wait for the transfer to be finished
-            while (!((*(volatile uint32_t*)(REG_BASE + OFFSET_S_SR)) & (1 << S_SR_TCOMP | 1 << S_SR_BUSERR | 1 << S_SR_NAK)));
+            Core::Time t0 = Core::time();
+            while (!((*(volatile uint32_t*)(REG_BASE + OFFSET_S_SR)) & (1 << S_SR_TCOMP | 1 << S_SR_BUSERR | 1 << S_SR_NAK))) {
+                if (Core::time() > t0 + TIMEOUT) {
+                    Error::happened(Error::Module::I2C, ERR_TIMEOUT, Error::Severity::CRITICAL);
+                }
+                Core::sleep(1);
+            }
 
             return n - DMA::getCounter(p->rxDMAChannel);
         }
@@ -583,7 +619,13 @@ namespace I2C {
 
         } else {
             // Wait for the transfer to be finished
-            while (!((*(volatile uint32_t*)(REG_BASE + OFFSET_S_SR)) & (1 << S_SR_TCOMP | 1 << S_SR_BUSERR | 1 << S_SR_NAK)));
+            Core::Time t0 = Core::time();
+            while (!((*(volatile uint32_t*)(REG_BASE + OFFSET_S_SR)) & (1 << S_SR_TCOMP | 1 << S_SR_BUSERR | 1 << S_SR_NAK))) {
+                if (Core::time() > t0 + TIMEOUT) {
+                    Error::happened(Error::Module::I2C, ERR_TIMEOUT, Error::Severity::CRITICAL);
+                }
+                Core::sleep(1);
+            }
 
             return DMA::isFinished(p->txDMAChannel);
         }
