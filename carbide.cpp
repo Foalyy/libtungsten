@@ -3,6 +3,7 @@
 #include <error.h>
 #include <scif.h>
 #include <pm.h>
+#include <bpm.h>
 #include <gpio.h>
 #include <usb.h>
 
@@ -65,6 +66,41 @@ namespace Carbide {
         // Set error handlers
         Error::setHandler(Error::Severity::WARNING, warningHandler);
         Error::setHandler(Error::Severity::CRITICAL, criticalHandler);
+    }
+
+    void setCPUFrequency(CPUFreq frequency) {
+        switch (frequency) {
+            case CPUFreq::FREQ_4MHZ:
+                SCIF::enableRCFAST(SCIF::RCFASTFrequency::RCFAST_4MHZ);
+                PM::setMainClockSource(PM::MainClockSource::RCFAST);
+                break;
+
+            case CPUFreq::FREQ_8MHZ:
+                SCIF::enableRCFAST(SCIF::RCFASTFrequency::RCFAST_8MHZ);
+                PM::setMainClockSource(PM::MainClockSource::RCFAST);
+                break;
+
+            case CPUFreq::FREQ_12MHZ:
+                SCIF::enableRCFAST(SCIF::RCFASTFrequency::RCFAST_12MHZ);
+                PM::setMainClockSource(PM::MainClockSource::RCFAST);
+                break;
+
+            case CPUFreq::FREQ_24MHZ:
+                SCIF::enableDFLL(24000000UL);
+                PM::setMainClockSource(PM::MainClockSource::DFLL);
+                break;
+
+            case CPUFreq::FREQ_36MHZ:
+                SCIF::enableDFLL(36000000UL);
+                PM::setMainClockSource(PM::MainClockSource::DFLL);
+                break;
+
+            case CPUFreq::FREQ_48MHZ:
+                BPM::setPowerScaling(BPM::PowerScaling::PS2);
+                SCIF::enableDFLL(48000000UL);
+                PM::setMainClockSource(PM::MainClockSource::DFLL);
+                break;
+        }
     }
 
 }

@@ -375,7 +375,7 @@ namespace I2C {
         }
 
         // Write at most BUFFER_SIZE characters
-        if (n >  BUFFER_SIZE) {
+        if (n > BUFFER_SIZE) {
             n = BUFFER_SIZE;
         }
 

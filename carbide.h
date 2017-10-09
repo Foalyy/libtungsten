@@ -15,8 +15,19 @@ namespace Carbide {
     const GPIO::Pin pinLedB = {GPIO::Port::A, 2};
     const GPIO::Pin pinButton = {GPIO::Port::A, 4};
 
+    // Predefined CPU frequencies
+    enum class CPUFreq {
+        FREQ_4MHZ,
+        FREQ_8MHZ,
+        FREQ_12MHZ,
+        FREQ_24MHZ,
+        FREQ_36MHZ,
+        FREQ_48MHZ
+    };
+
     // Helper functions
     void init();
+    void setCPUFrequency(CPUFreq frequency);
     void warningHandler(Error::Module module, int userModule, Error::Code code);
     void criticalHandler(Error::Module module, int userModule, Error::Code code);
     inline void initLedR() { GPIO::enableOutput(pinLedR, GPIO::HIGH); }

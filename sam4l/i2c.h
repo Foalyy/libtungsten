@@ -155,7 +155,7 @@ namespace I2C {
         SCL
     };
 
-    // Timeout
+    // Timeout for transfer operations
     const int TIMEOUT = 3000; // ms
 
     // Interrupts
