@@ -22,7 +22,7 @@ namespace BSCIF {
                 | 1 << OSCCTRL32_EN1K       // EN1K : enable 1kHz output
                 | 3 << OSCCTRL32_MODE       // MODE : crystal
                 | 8 << OSCCTRL32_SELCURR    // SELCURR : current driven into the crystal
-                | 5 << OSCCTRL32_STARTUP;   // STARTUP : oscillator startup time
+                | 0 << OSCCTRL32_STARTUP;   // STARTUP : oscillator startup time
 
         // Enable OSC32
         (*(volatile uint32_t*)(BSCIF_BASE + OFFSET_OSCCTRL32))

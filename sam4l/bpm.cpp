@@ -15,21 +15,27 @@ namespace BPM {
     void interruptHandlerWrapper();
 
     void setPowerScaling(PowerScaling ps) {
+        Core::stashInterrupts();
+
         // Enable Flash High Speed mode if entering PS2
         if (ps == PowerScaling::PS2) {
             Flash::enableHighSpeedMode();
         }
+
+        // Get the value of PMCON without PS
+        uint32_t pmcon = (*(volatile uint32_t*)(BASE + OFFSET_PMCON)) & ~(uint32_t)(0b11 << PMCON_PS);
 
         // Unlock the PMCON register, which is locked by default as a safety mesure
         (*(volatile uint32_t*)(BASE + OFFSET_UNLOCK))
                 = UNLOCK_KEY               // KEY : Magic word (see datasheet)
                 | OFFSET_PMCON;            // ADDR : unlock PMCON
 
-        // Change the power scaling setting
+        // Select the power scaling register and request a Power Scaling Change
         (*(volatile uint32_t*)(BASE + OFFSET_PMCON))
-                = static_cast<int>(ps) << PMCON_PS // PS : select Power Scaling mode
+                = pmcon
+                | static_cast<int>(ps) << PMCON_PS // PS : select Power Scaling mode
                 | 1 << PMCON_PSCREQ                // PSCREQ : Power Scaling Change Request
-                | 1 << PMCON_PSCM;                 // PMSCM : Power Scaling Change Mode : no-halt (undocumented)
+                | 1 << PMCON_PSCM;                 // PSCM : Power Scaling Change Request
 
         // Wait for the Power Scaling OK flag
         while (!(*(volatile uint32_t*)(BASE + OFFSET_SR) & (1 << SR_PSOK)));
@@ -41,6 +47,8 @@ namespace BPM {
 
         // Save the current setting
         _currentPS = ps;
+
+        Core::applyStashedInterrupts();
     }
 
     PowerScaling currentPowerScaling() {

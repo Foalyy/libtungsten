@@ -17,7 +17,7 @@
 
 
 // Configuration
-const bool MODE_INPUT = true;
+const bool MODE_INPUT = false;
 const bool MODE_TIMEOUT = true;
 const bool CHANNEL_USART = false;
 const bool CHANNEL_USB = true;

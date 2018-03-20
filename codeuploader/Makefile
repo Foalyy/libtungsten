@@ -3,7 +3,7 @@
 NAME=codeuploader
 CXX=g++
 CXXFLAGS=-std=c++11 -Wall -g
-LFLAGS=-lboost_system -lusb-1.0
+LFLAGS=-lboost_system -lusb-1.0 -lpthread
 OBJS=usb.o
 
 

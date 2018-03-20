@@ -42,6 +42,9 @@ namespace I2C {
     // Registers base address
     const uint32_t I2C_BASE[] = {0x40018000, 0x4001C000, 0x40078000, 0x4007C000};
 
+    // I2C clock frequency
+    unsigned int _frequency = 0;
+
 
     // Common initialisation code shared between Master and Slave modes
     void enable(Port port) {
@@ -87,7 +90,7 @@ namespace I2C {
         p->mode = Mode::NONE;
     }
 
-    bool enableMaster(Port port) {
+    bool enableMaster(Port port, unsigned int frequency) {
         if (static_cast<int>(port) > N_PORTS_M) {
             return false;
         }
@@ -119,10 +122,10 @@ namespace I2C {
         // First, compute the base period of the correctly prescaled clock
         // Then, compute the counters based on this period
         // To respect the 100kHz frequency, t(HIGH) + t(HD_DATA) + t(LOW) + t(SU_DATA) = 10µs must be respected
-        unsigned int prescalerExp = 1; // Prescaler factor : 2**(EXP + 1) => clock is divided by 4
-        unsigned int t = 100000000L / (PM::getModuleClockFrequency(PM_CLK_M[static_cast<int>(port)]) / 4); // Base period in 1/100th of µs
-        unsigned int high = 300 / t; // HIGH : 4µs
-        unsigned int low = 300 / t; // LOW : 4µs
+        /*unsigned int prescalerExp = 1; // Prescaler factor : 2**(EXP + 1) => clock is divided by 4
+        unsigned int t = 1000000000UL / (PM::getModuleClockFrequency(PM_CLK_M[static_cast<int>(port)]) / 4); // Base period in ns
+        unsigned int high = 400 / t; // HIGH : 4µs
+        unsigned int low = 400 / t; // LOW : 4µs
         unsigned int data = 100 / t; // DATA : 1µs each for HD_DATA and SU_DATA
         unsigned int stasto = 200 / t; // START/STOP : 2µs
         (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CWGR))
@@ -130,7 +133,18 @@ namespace I2C {
             | high << M_CWGR_HIGH         // HIGH : high counter
             | stasto << M_CWGR_STASTO     // STASTO : start/stop counters
             | data << M_CWGR_DATA         // DATA : data time counter
-            | prescalerExp << M_CWGR_EXP; // EXP : clock prescaler
+            | prescalerExp << M_CWGR_EXP; // EXP : clock prescaler*/
+
+        _frequency = frequency;
+        unsigned long fPrescaler = PM::getModuleClockFrequency(PM_CLK_M[static_cast<int>(port)]) / 2; // Prescaler at EXP=0 divides the freq. by 2
+        unsigned int periods = fPrescaler / frequency;
+        uint8_t t = periods / 2;
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CWGR))
+            = t << M_CWGR_LOW      // LOW : low and buffer counter
+            | t << M_CWGR_HIGH     // HIGH : high counter
+            | t << M_CWGR_STASTO   // STASTO : start/stop counters
+            | 1 << M_CWGR_DATA     // DATA : data time counter
+            | 0 << M_CWGR_EXP; // EXP : clock prescaler
 
         // SRR (Slew Rate Register) : setup the lines
         // See Electrical Characteristics in the datasheet for more details
@@ -190,17 +204,24 @@ namespace I2C {
             = 1 << S_CR_SEN           // SEN : Slave Enable
             | 1 << S_CR_SMATCH        // SMATCH : Acknowledge the slave address
             | 0 << S_CR_STREN         // STREN : Clock stretch disabled
+            | 1 << S_CR_CUP           // CUP : NBYTES Count Up
             | address << S_CR_ADR;    // ADDR : Slave Address
 
         // TR (Timing Register) : setup bus timings
         (*(volatile uint32_t*)(REG_BASE + OFFSET_S_TR))
             = 1 << S_TR_SUDAT;        // SUDAT : Data setup cycles
 
+        // NBYTES : reset the bytes counter
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_NBYTES)) = 0;
+
         // Set up the DMA channels and related interrupts
         p->rxDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_S_RX) + static_cast<int>(port)), 
                 (uint32_t)(p->buffer), BUFFER_SIZE, DMA::Size::BYTE);
         p->txDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_S_TX) + static_cast<int>(port)),
                 (uint32_t)(p->buffer), BUFFER_SIZE, DMA::Size::BYTE);
+
+        // Initialize the slave with an empty write
+        I2C::write(port, nullptr, 0, true);
 
         return true;
     }
@@ -543,6 +564,9 @@ namespace I2C {
         // Dummy read to clear RHR in case of overrun
         (*(volatile uint32_t*)(REG_BASE + OFFSET_S_RHR));
 
+        // NBYTES : reset the bytes counter
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_NBYTES)) = 0;
+
         // Save the number of bytes to read
         p->nBytesToRead = n;
 
@@ -581,36 +605,52 @@ namespace I2C {
         // Stop any previous transfer
         DMA::stopChannel(p->txDMAChannel);
 
-        // Write at most BUFFER_SIZE - 1 + 1 = BUFFER_SIZE characters into the port buffer : 
-        // - 1 to allow room for the 0xFF terminating byte (see below)
-        // + 1 because the first byte in the user buffer is written directly to THR (see below)
-        if (n >= BUFFER_SIZE) {
-            n = BUFFER_SIZE;
-            ret = false;
+        // NBYTES : reset the bytes counter
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_NBYTES)) = 0;
+
+        // Empty transfer
+        if (n == 0 || buffer == nullptr) {
+            // Copy the first byte to THR to overwrite any previous byte waiting to be sent
+            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_THR)) = 0xFF;
+
+            // Clear every status
+            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_SCR)) = 0xFFFFFFFF;
+
+            // Start the DMA
+            DMA::startChannel(p->txDMAChannel, (uint32_t)(p->buffer), 0);
+
+        } else {
+            // Write at most BUFFER_SIZE - 1 + 1 = BUFFER_SIZE characters into the port buffer : 
+            // - 1 to allow room for the 0xFF terminating byte (see below)
+            // + 1 because the first byte in the user buffer is written directly to THR (see below)
+            if (n >= BUFFER_SIZE) {
+                n = BUFFER_SIZE;
+                ret = false;
+            }
+
+            // Copy the first byte to THR to overwrite any previous byte waiting to be sent
+            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_THR)) = buffer[0];
+
+            // Copy the rest of the user buffer into the port buffer
+            for (int i = 0; i < n - 1; i++) {
+                p->buffer[i] = buffer[i + 1];
+            }
+
+            // Save the number of bytes to write
+            p->nBytesToWrite = n - 1;
+
+            // Write a 0xFF at the end of the buffer
+            // Since the last byte is repeated indefinitely when the master attempts to read
+            // more bytes than were available, this forces the hardware to send only 0xFF bytes.
+            p->buffer[n - 1] = 0xFF;
+            n++;
+
+            // Clear every status
+            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_SCR)) = 0xFFFFFFFF;
+
+            // Start the DMA
+            DMA::startChannel(p->txDMAChannel, (uint32_t)(p->buffer), n - 1);
         }
-
-        // Copy the first byte to THR to overwrite any previous byte waiting to be sent
-        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_THR)) = buffer[0];
-
-        // Copy the rest of the user buffer into the port buffer
-        for (int i = 0; i < n - 1; i++) {
-            p->buffer[i] = buffer[i + 1];
-        }
-
-        // Save the number of bytes to write
-        p->nBytesToWrite = n - 1;
-
-        // Write a 0xFF at the end of the buffer
-        // Since the last byte is repeated indefinitely when the master attempts to read
-        // more bytes than were available, this forces the hardware to send only 0xFF bytes.
-        p->buffer[n - 1] = 0xFF;
-        n++;
-
-        // Clear every status
-        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_SCR)) = 0xFFFFFFFF;
-
-        // Start the DMA
-        DMA::startChannel(p->txDMAChannel, (uint32_t)(p->buffer), n - 1);
 
         if (async) {
             // In async mode, do not wait for the read to complete, it will be managed in background
@@ -653,7 +693,7 @@ namespace I2C {
         return (status & 1 << S_SR_TRA) && (status & (1 << S_SR_TCOMP | 1 << S_SR_BUSERR | 1 << S_SR_NAK));
     }
 
-    // Check the number of bytes which still have to be read in the current async transfer
+    // Get the number of bytes which have been read in the current async transfer
     int getAsyncReadCounter(Port port) {
         struct Channel* p = &(ports[static_cast<int>(port)]);
         if (p->mode != Mode::SLAVE) {
@@ -666,7 +706,16 @@ namespace I2C {
         return 0;
     }
 
-    // Check the number of bytes which still have to be written in the current async transfer
+    // Get the number of bytes which have been sent by the master during a read transfer.
+    // This will usually be equal to getAsyncReadCounter(), but may be greater in case the
+    // master sent more bytes than the buffer allowed. Comparing the two values allows
+    // to determine if data was lost during the transfer.
+    int getAsyncReadCounterSent(Port port) {
+        const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
+        return *(volatile uint32_t*)(REG_BASE + OFFSET_S_NBYTES) & 0xFF;
+    }
+
+    // Get the number of bytes which have been written in the current async transfer
     int getAsyncWriteCounter(Port port) {
         struct Channel* p = &(ports[static_cast<int>(port)]);
         if (p->mode != Mode::SLAVE) {
@@ -722,11 +771,15 @@ namespace I2C {
         void (*handler)() = nullptr;
         if ((*(volatile uint32_t*)(REG_BASE + OFFSET_S_SR)) & (1 << S_SR_TRA)) {
             handler = (void (*)())_interruptHandlers[static_cast<int>(port)][static_cast<int>(Interrupt::ASYNC_WRITE_FINISHED)];
+            I2C::write(port, nullptr, 0, true);
+            if (handler != nullptr) {
+                handler();
+            }
         } else {
             handler = (void (*)())_interruptHandlers[static_cast<int>(port)][static_cast<int>(Interrupt::ASYNC_READ_FINISHED)];
-        }
-        if (handler != nullptr) {
-            handler();
+            if (handler != nullptr) {
+                handler();
+            }
         }
 
         // SCR (Status Clear Register) : clear the interrupt

@@ -204,12 +204,18 @@ namespace SCIF {
     }
 
     void enableRCFAST(RCFASTFrequency frequency, bool enabled) {
-        // Unlock the RCFASTCFG register, which is locked by default as a safety mesure
-        (*(volatile uint32_t*)(SCIF_BASE + OFFSET_UNLOCK))
-                = UNLOCK_KEY            // KEY : Magic word (see datasheet)
-                | OFFSET_RCFASTCFG;     // ADDR : unlock RCFASTCFG
-
         if (enabled) {
+            // If the RCFAST is already enabled, disable it first
+            if (_rcfastFrequency > 0) {
+                // Unlock the RCFASTCFG register, which is locked by default as a safety mesure
+                (*(volatile uint32_t*)(SCIF_BASE + OFFSET_UNLOCK))
+                        = UNLOCK_KEY            // KEY : Magic word (see datasheet)
+                        | OFFSET_RCFASTCFG;     // ADDR : unlock RCFASTCFG
+
+                // Disable RCFAST
+                (*(volatile uint32_t*)(SCIF_BASE + OFFSET_RCFASTCFG)) = 0;
+            }
+
             // Save the frequency for future use
             switch (frequency) {
                 case RCFASTFrequency::RCFAST_4MHZ:
@@ -228,6 +234,11 @@ namespace SCIF {
                     return;
             }
 
+            // Unlock the RCFASTCFG register, which is locked by default as a safety mesure
+            (*(volatile uint32_t*)(SCIF_BASE + OFFSET_UNLOCK))
+                    = UNLOCK_KEY            // KEY : Magic word (see datasheet)
+                    | OFFSET_RCFASTCFG;     // ADDR : unlock RCFASTCFG
+
             // Configure RCFAST
             (*(volatile uint32_t*)(SCIF_BASE + OFFSET_RCFASTCFG))
                     = 1 << RCFASTCFG_EN                                // EN : enable the oscillator
@@ -243,6 +254,11 @@ namespace SCIF {
         } else {
             // Reset the saved frequency
             _rcfastFrequency = 0;
+
+            // Unlock the RCFASTCFG register, which is locked by default as a safety mesure
+            (*(volatile uint32_t*)(SCIF_BASE + OFFSET_UNLOCK))
+                    = UNLOCK_KEY            // KEY : Magic word (see datasheet)
+                    | OFFSET_RCFASTCFG;     // ADDR : unlock RCFASTCFG
 
             // Disable RCFAST
             (*(volatile uint32_t*)(SCIF_BASE + OFFSET_RCFASTCFG)) = 0;

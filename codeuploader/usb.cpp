@@ -5,7 +5,7 @@
 static const int TIMEOUT = 1000; // ms
 static libusb_device_handle* _handle = nullptr;
 
-static const bool DEBUG = false;
+static const bool DEBUG = true;
 
 int initUSB(uint16_t vid, uint16_t pid, uint8_t interface) {
     int r = libusb_init(NULL);

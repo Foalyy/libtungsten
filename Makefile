@@ -140,6 +140,9 @@ flash: $(NAME).hex
 	@echo "== Flashing into chip (make sure OpenOCD is started in background using 'make openocd')"
 	echo "reset halt; flash write_image erase unlock $(NAME).hex; reset run; exit" | netcat localhost 4444
 
+autoflash: $(NAME).hex
+	$(OPENOCD) -f $(OPENOCD_CFG) & (sleep 1; echo "reset halt; flash write_image erase unlock $(NAME).hex; reset run; exit" | netcat localhost 4444) > /dev/null; killall openocd
+
 # Erase the chip's flash using OpenOCD
 erase:
 	@echo "== Erasing the chip's flash..."

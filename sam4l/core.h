@@ -18,6 +18,11 @@ namespace Core {
     const uint32_t AIRCR = 0xE000ED0C;      // Application Interrupt and Reset Control Register
     const uint32_t SCR = 0xE000ED10;        // System Control Register
     const uint32_t CCR = 0xE000ED14;        // Configuration and Control Register
+    const uint32_t CFSR = 0xE000ED28;       // Configurable Fault Status Register
+    const uint32_t HFSR = 0xE000ED2C;       // HardFault Status Register
+    const uint32_t DFSR = 0xE000ED30;       // Debug Fault Status Register
+    const uint32_t MMFAR = 0xE000ED30;      // MemManage Fault Address Register
+    const uint32_t BFAR = 0xE000ED38;       // BusFault Address Register
 
     // SysTick Registers
     const uint32_t SYST_CSR = 0xE000E010;   // SysTick Control and Status Register
@@ -26,6 +31,7 @@ namespace Core {
     const uint32_t SYST_CALIB = 0xE000E01C; // SysTick Calibration value register
 
     // Nested Vectored Interrupt Controller (NVIC) Registers
+    const int N_NVIC_IMPLEMENTED = 3;
     const uint32_t NVIC_ISER0 = 0xE000E100; // Interrupt Set-Enable Register 0
     const uint32_t NVIC_ICER0 = 0xE000E180; // Interrupt Clear-Enable Register 0
     const uint32_t NVIC_ISPR0 = 0xE000E200; // Interrupt Set-Pending Register 0
@@ -173,6 +179,8 @@ namespace Core {
     inline void enableInterrupts() { __asm__("CPSIE I"); } // Change Program State Interrupt Enable
     inline void disableInterrupts() { __asm__("CPSID I"); } // Change Program State Interrupt Disable
     void setInterruptPriority(Interrupt interrupt, uint8_t priority);
+    void stashInterrupts();
+    void applyStashedInterrupts();
     Interrupt currentInterrupt();
 
     // Time and power related functions

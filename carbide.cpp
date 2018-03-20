@@ -52,8 +52,7 @@ namespace Carbide {
     void init() {
         // Init the microcontroller on the default 12MHz clock
         Core::init();
-        SCIF::enableRCFAST(SCIF::RCFASTFrequency::RCFAST_12MHZ);
-        PM::setMainClockSource(PM::MainClockSource::RCFAST);
+        setCPUFrequency(CPUFreq::FREQ_12MHZ);
 
         // Init the USB port start the bootloader when requested
         //USB::initDevice();
@@ -101,6 +100,9 @@ namespace Carbide {
                 PM::setMainClockSource(PM::MainClockSource::DFLL);
                 break;
         }
+
+        // Wait 100ms to make sure the clocks have stabilized
+        Core::sleep(100);
     }
 
 }

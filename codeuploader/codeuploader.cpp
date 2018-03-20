@@ -10,6 +10,8 @@
 using namespace std;
 using namespace boost;
 
+const bool DEBUG = true;
+
 enum Request {
     START_BOOTLOADER,
     CONNECT,
@@ -26,6 +28,7 @@ enum class Status {
 
 unsigned int parseHex(const string& str, int pos=0, int n=2);
 void waitReady();
+void debug(const char* str);
 
 // Open an ihex file and send it to the bootloader
 int main(int argc, char** argv) {
@@ -48,6 +51,7 @@ int main(int argc, char** argv) {
     asio::serial_port serial(io);
     if (serialPortName.empty()) {
         // USB
+        debug("Opening USB port 0x1209:0x0001");
         int r = initUSB(0x1209, 0x0001);
         if (r == LIBUSB_ERROR_NO_DEVICE) {
             cout << endl << "Device not found. Are you sure the cable is plugged and the bootloader started?" << endl;
@@ -55,14 +59,18 @@ int main(int argc, char** argv) {
         if (r < 0) {
             return 0;
         }
+        debug("Sending START_BOOTLOADER request");
         sendRequest(START_BOOTLOADER);
+        debug("Closing USB");
         closeUSB();
         this_thread::sleep_for(chrono::milliseconds(10));
         int timeout = 500;
+        debug("Trying to open USB port 0x1209:0x0001");
         for (int i = 0; i < timeout; i++) {
             int r = initUSB(0x1209, 0x0001);
             if (r == 0) {
                 // Connected!
+                debug("Port opened");
                 break;
             } else if (r != LIBUSB_ERROR_NO_DEVICE) {
                 // Error
@@ -75,6 +83,7 @@ int main(int argc, char** argv) {
                 return -1;
             }
         }
+        debug("Sending CONNECT request");
         sendRequest(CONNECT);
         waitReady();
         cout << "Connected to bootloader" << endl;
@@ -123,7 +132,6 @@ int main(int argc, char** argv) {
     for (unsigned int i = 0; i < s; i++) {
         line = lines.at(i);
 
-
         int p = 100 * (i + 1) / s;
         if (p > lastp) {
             if (i > 0) {
@@ -152,6 +160,8 @@ int main(int argc, char** argv) {
             asio::write(serial, asio::buffer(&endOfLine, 1));
 
         } else {
+            debug("Sending WRITE request");
+            printf("%s\n", line);
             sendRequest(WRITE, 0, frameNumber, Direction::OUTPUT, (uint8_t*)line.data(), line.size());
             frameNumber++;
             if (i < s - 1) { // If not last frame
@@ -189,10 +199,12 @@ int main(int argc, char** argv) {
 }
 
 void waitReady() {
+    debug("Waiting for READY status");
     Status status;
     while (true) {
         status = static_cast<Status>(ask(STATUS));
         if (status == Status::READY) {
+            debug("READY");
             break;
         } else if (status == Status::ERROR) {
             cerr << "Error " << static_cast<int>(status) << endl;
@@ -201,4 +213,11 @@ void waitReady() {
             this_thread::sleep_for(chrono::milliseconds(3));
         }
     };
+}
+
+void debug(const char* str) {
+    if (DEBUG) {
+        printf(str);
+        printf("\n");
+    }
 }

@@ -5,7 +5,7 @@ NAME=bootloader
 CORTEX_M=4
 CHIP_FAMILY=sam4l
 PACKAGE=64
-DEBUG=true
+DEBUG=false
 
 MODULES=tc usart wdt
 

@@ -76,37 +76,6 @@ namespace PM {
         _cpuClockFrequency = _mainClockFrequency / (1 << cpudiv);
         _hsbClockFrequency = _mainClockFrequency;
         _pbaClockFrequency = _mainClockFrequency;
-
-        // Unlock the PBASEL register
-        (*(volatile uint32_t*)(BASE + OFFSET_UNLOCK))
-                = UNLOCK_KEY               // KEY : Magic word (see datasheet)
-                | OFFSET_PBASEL;           // ADDR : unlock PBASEL
-
-        // Ensure that the PBA clock is between 4 MHz and 8 MHz using the prescaler
-        // If the PBA clock is too high, some modules won't be able to generate
-        // clocks low enough (such as the 100 kHz SCL line for the I2C controller
-        // or the timer/counter clocks)
-        if (_mainClockFrequency > PBA_MAX_FREQUENCY) {
-
-            // Find a divider
-            uint8_t divider = 0;
-            for (int i = 0; i <= 7; i++) {
-                _pbaClockFrequency >>= 1; // Divide by 2
-                divider++;
-
-                if (_pbaClockFrequency <= PBA_MAX_FREQUENCY) {
-                    break;
-                }
-            }
-
-            // Set up the divider
-            (*(volatile uint32_t*)(BASE + OFFSET_PBASEL))
-                    = 1 << 7          // PBDIV : enable the prescaler
-                    | (divider - 1);  // PBSEL : divide the clock by 2^(PBSEL + 1)
-        } else {
-            // Disable the divider
-            (*(volatile uint32_t*)(BASE + OFFSET_PBASEL)) = 0;
-        }
     }
 
     unsigned long getModuleClockFrequency(uint8_t peripheral) {

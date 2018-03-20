@@ -126,7 +126,7 @@ namespace USB {
         PM::enablePeripheralClock(PM::CLK_USB);
         SCIF::enableRCFAST(SCIF::RCFASTFrequency::RCFAST_12MHZ);
         SCIF::enablePLL(1, 0, SCIF::GCLKSource::RCFAST, 12000000UL);
-        SCIF::enableGenericClock(SCIF::GCLKChannel::GCLK7_USB, SCIF::GCLKSource::PLL0);
+        SCIF::enableGenericClock(SCIF::GCLKChannel::GCLK7_USB, SCIF::GCLKSource::PLL);
 
         // Check the clock
         if (!((*(volatile uint32_t*)(USB_BASE + OFFSET_USBSTA)) & (1 << USBSTA_CLKUSABLE))) {

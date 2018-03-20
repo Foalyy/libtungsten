@@ -17,6 +17,9 @@ namespace Core {
     // and http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0553a/Ciheijba.html.
     uint32_t _isrVector[N_INTERNAL_EXCEPTIONS + N_EXTERNAL_INTERRUPTS] __attribute__ ((aligned (512)));
 
+    // This array is used to store the NVIC ISERs (Interrupt Set-Enable Registers) when interrupts are stashed
+    uint32_t _nvicStash[N_NVIC_IMPLEMENTED];
+
 
     // Initialize the core components : exceptions/interrupts table, 
     // clocks, SysTick (system timer), ...
@@ -38,7 +41,7 @@ namespace Core {
         // Change the core vector pointer to the new table
         (*(volatile uint32_t*) VTOR) = (uint32_t) _isrVector;
 
-        // Init the error system
+        // Init the error reporting system
         Error::init();
 
         // Init the GPIO module
@@ -54,6 +57,9 @@ namespace Core {
         // Init the SysTick which is used as a high-speed time reference (based on CPU clock)
         // This is required by waitMicroseconds()
         enableSysTick();
+
+        // Init the stashed interrupts array
+        memset(_nvicStash, 0, N_NVIC_IMPLEMENTED * sizeof(uint32_t));
     }
 
     // Reset the chip
@@ -119,6 +125,33 @@ namespace Core {
     void setInterruptPriority(Interrupt interrupt, uint8_t priority) {
         // IPR (Interrupt Priority Register) : set the interrupt priority
         (*(volatile uint8_t*) (NVIC_IPR0 + static_cast<int>(interrupt))) = priority;
+    }
+
+    // Disable temporarily all the interrupts at the NVIC level. The user is still
+    // able to re-enable some interrupts manually. This is useful to create a code
+    // section where only some selected interrupts can be triggered. Use applyStashedInterrupts()
+    // to enable the interrupts as they were before.
+    void stashInterrupts() {
+        disableInterrupts();
+
+        for (int i = 0; i < N_NVIC_IMPLEMENTED; i++) {
+            _nvicStash[i] = (*(volatile uint32_t*) (NVIC_ISER0 + i * sizeof(uint32_t)));
+            (*(volatile uint32_t*) (NVIC_ICER0 + i * sizeof(uint32_t))) = 0xFFFFFFFF;
+        }
+
+        enableInterrupts();
+    }
+
+    // Re-enable stashed interrupts. Note that this will not disable interrupts that were
+    // manually enabled after stashInterrupts()
+    void applyStashedInterrupts() {
+        disableInterrupts();
+
+        for (int i = 0; i < N_NVIC_IMPLEMENTED; i++) {
+            (*(volatile uint32_t*) (NVIC_ISER0 + i * sizeof(uint32_t))) = _nvicStash[i];
+        }
+
+        enableInterrupts();
     }
 
     Interrupt currentInterrupt() {

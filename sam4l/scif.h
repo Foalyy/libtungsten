@@ -132,7 +132,7 @@ namespace SCIF {
         CLKPBD = 12,
         RC32K = 13,
         CLK1K = 15,
-        PLL0 = 16,
+        PLL = 16,
         HRP = 17,
         FP = 18,
         GCLKIN0 = 19,

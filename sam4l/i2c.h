@@ -107,7 +107,7 @@ namespace I2C {
     const uint8_t S_CR_SMHH = 10;
     const uint8_t S_CR_PECEN = 11;
     const uint8_t S_CR_ACK = 12;
-    const uint8_t S_CR_CPU = 13;
+    const uint8_t S_CR_CUP = 13;
     const uint8_t S_CR_SOAM = 14;
     const uint8_t S_CR_SODR = 15;
     const uint8_t S_CR_ADR = 16;
@@ -180,7 +180,7 @@ namespace I2C {
     void setPin(Port port, PinFunction function, GPIO::Pin pin);
 
     // Master-mode functions
-    bool enableMaster(Port port);
+    bool enableMaster(Port port, unsigned int frequency=100000);
     int read(Port port, uint8_t address, uint8_t* buffer, int n);
     uint8_t read(Port port, uint8_t address);
     bool write(Port port, uint8_t address, const uint8_t* buffer, int n);
@@ -196,6 +196,7 @@ namespace I2C {
     bool isAsyncReadFinished(Port port);
     bool isAsyncWriteFinished(Port port);
     int getAsyncReadCounter(Port port);
+    int getAsyncReadBytesSent(Port port);
     int getAsyncWriteCounter(Port port);
     void enableInterrupt(Port port, void (*handler)(), Interrupt interrupt);
 
