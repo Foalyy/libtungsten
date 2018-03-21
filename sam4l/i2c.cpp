@@ -58,6 +58,11 @@ namespace I2C {
         // Set the pins in peripheral mode
         GPIO::enablePeripheral(PINS_SDA[static_cast<int>(port)]);
         GPIO::enablePeripheral(PINS_SCL[static_cast<int>(port)]);
+
+        // Initialize interrupt handlers
+        for (int i = 0; i < N_INTERRUPTS; i++) {
+            _interruptHandlers[static_cast<int>(port)][i] = (uint32_t)nullptr;
+        }
     }
 
     void disable(Port port) {
@@ -89,6 +94,33 @@ namespace I2C {
 
         p->mode = Mode::NONE;
     }
+
+    void reset(Port port) {
+        const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
+        struct Channel* p = &(ports[static_cast<int>(port)]);
+
+        if (p->mode == Mode::MASTER) {
+            // CR (Control Register) : reset the interface
+            (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
+                = 1 << M_CR_SWRST;        // SWRST : software reset
+
+            // CR (Control Register) : enable the master interface
+            (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
+                = 1 << M_CR_MEN;          // MEN : Master Enable
+
+        } else if (p->mode == Mode::SLAVE) {
+            // CR (Control Register) : reset the interface
+            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_CR))
+                = 1 << S_CR_SWRST;        // SWRST : software reset
+
+            // CR (Control Register) : enable the slave interface
+            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_CR))
+                = 1 << S_CR_SEN;          // SEN : Slave Enable
+        }
+    }
+
+
+    // Master functions
 
     bool enableMaster(Port port, unsigned int frequency) {
         if (static_cast<int>(port) > N_PORTS_M) {
@@ -167,91 +199,6 @@ namespace I2C {
 
         return true;
     }
-
-    bool enableSlave(Port port, uint8_t address) {
-        if (static_cast<int>(port) > N_PORTS_S) {
-            return false;
-        }
-        const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
-        struct Channel* p = &(ports[static_cast<int>(port)]);
-
-        // If this port is already enabled in master mode, disable it
-        if (p->mode == Mode::MASTER) {
-            Error::happened(Error::Module::I2C, WARN_PORT_ALREADY_INITIALIZED, Error::Severity::WARNING);
-            (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
-                = 1 << M_CR_MDIS
-                | 1 << M_CR_STOP;
-        }
-        p->mode = Mode::SLAVE;
-        
-        // Common initialization
-        enable(port);
-
-        // Enable the clock
-        PM::enablePeripheralClock(PM_CLK_S[static_cast<int>(port)]);
-
-        // CR (Control Register) : reset the interface
-        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_CR))
-            = 1 << S_CR_SWRST;        // SWRST : software reset
-
-        // CR (Control Register) : enable the slave interface
-        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_CR))
-            = 1 << S_CR_SEN;          // SEN : Slave Enable
-
-        // CR (Control Register) : configure the interface
-        address &= 0x7F;
-        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_CR))
-            = 1 << S_CR_SEN           // SEN : Slave Enable
-            | 1 << S_CR_SMATCH        // SMATCH : Acknowledge the slave address
-            | 0 << S_CR_STREN         // STREN : Clock stretch disabled
-            | 1 << S_CR_CUP           // CUP : NBYTES Count Up
-            | address << S_CR_ADR;    // ADDR : Slave Address
-
-        // TR (Timing Register) : setup bus timings
-        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_TR))
-            = 1 << S_TR_SUDAT;        // SUDAT : Data setup cycles
-
-        // NBYTES : reset the bytes counter
-        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_NBYTES)) = 0;
-
-        // Set up the DMA channels and related interrupts
-        p->rxDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_S_RX) + static_cast<int>(port)), 
-                (uint32_t)(p->buffer), BUFFER_SIZE, DMA::Size::BYTE);
-        p->txDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_S_TX) + static_cast<int>(port)),
-                (uint32_t)(p->buffer), BUFFER_SIZE, DMA::Size::BYTE);
-
-        // Initialize the slave with an empty write
-        I2C::write(port, nullptr, 0, true);
-
-        return true;
-    }
-
-    void reset(Port port) {
-        const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
-        struct Channel* p = &(ports[static_cast<int>(port)]);
-
-        if (p->mode == Mode::MASTER) {
-            // CR (Control Register) : reset the interface
-            (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
-                = 1 << M_CR_SWRST;        // SWRST : software reset
-
-            // CR (Control Register) : enable the master interface
-            (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
-                = 1 << M_CR_MEN;          // MEN : Master Enable
-
-        } else if (p->mode == Mode::SLAVE) {
-            // CR (Control Register) : reset the interface
-            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_CR))
-                = 1 << S_CR_SWRST;        // SWRST : software reset
-
-            // CR (Control Register) : enable the slave interface
-            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_CR))
-                = 1 << S_CR_SEN;          // SEN : Slave Enable
-        }
-    }
-
-
-    // Master functions
 
     // Internal function which checks if the controller has lost the bus arbitration
     // to another master. If no other master is present and this condition arises, 
@@ -549,6 +496,74 @@ namespace I2C {
 
     // Slave functions
 
+    bool enableSlave(Port port, uint8_t address) {
+        if (static_cast<int>(port) > N_PORTS_S) {
+            return false;
+        }
+        const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
+        struct Channel* p = &(ports[static_cast<int>(port)]);
+
+        // If this port is already enabled in master mode, disable it
+        if (p->mode == Mode::MASTER) {
+            Error::happened(Error::Module::I2C, WARN_PORT_ALREADY_INITIALIZED, Error::Severity::WARNING);
+            (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
+                = 1 << M_CR_MDIS
+                | 1 << M_CR_STOP;
+        }
+        p->mode = Mode::SLAVE;
+        
+        // Common initialization
+        enable(port);
+
+        // Enable the clock
+        PM::enablePeripheralClock(PM_CLK_S[static_cast<int>(port)]);
+
+        // CR (Control Register) : reset the interface
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_CR))
+            = 1 << S_CR_SWRST;        // SWRST : software reset
+
+        // CR (Control Register) : enable the slave interface
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_CR))
+            = 1 << S_CR_SEN;          // SEN : Slave Enable
+
+        // CR (Control Register) : configure the interface
+        address &= 0x7F;
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_CR))
+            = 1 << S_CR_SEN           // SEN : Slave Enable
+            | 1 << S_CR_SMATCH        // SMATCH : Acknowledge the slave address
+            | 0 << S_CR_STREN         // STREN : Clock stretch disabled
+            | 1 << S_CR_CUP           // CUP : NBYTES Count Up
+            | address << S_CR_ADR;    // ADDR : Slave Address
+
+        // TR (Timing Register) : setup bus timings
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_TR))
+            = 1 << S_TR_SUDAT;        // SUDAT : Data setup cycles
+
+        // NBYTES : reset the bytes counter
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_NBYTES)) = 0;
+
+        // Set up the DMA channels and related interrupts
+        p->rxDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_S_RX) + static_cast<int>(port)), 
+                (uint32_t)(p->buffer), BUFFER_SIZE, DMA::Size::BYTE);
+        p->txDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_S_TX) + static_cast<int>(port)),
+                (uint32_t)(p->buffer), BUFFER_SIZE, DMA::Size::BYTE);
+
+        // IER (Interrupt Enable Register) : enable the Transfer Complete interrupt
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_IER))
+                = 1 << S_SR_TCOMP;
+
+        // Enable the interrupt in the NVIC
+        Core::Interrupt interruptChannel = _interruptChannelsSlave[static_cast<int>(port)];
+        Core::setInterruptHandler(interruptChannel, interruptHandlerWrapper);
+        Core::enableInterrupt(interruptChannel, INTERRUPT_PRIORITY);
+
+        // Initialize the slave with an empty read and write
+        //I2C::read(port, nullptr, 0, true);
+        I2C::write(port, nullptr, 0, true);
+
+        return true;
+    }
+
     // Slave read
     int read(Port port, uint8_t* buffer, int n, bool async) {
         struct Channel* p = &(ports[static_cast<int>(port)]);
@@ -729,7 +744,6 @@ namespace I2C {
     }
 
     void enableInterrupt(Port port, void (*handler)(), Interrupt interrupt) {
-        const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
         struct Channel* p = &(ports[static_cast<int>(port)]);
         if (p->mode != Mode::SLAVE) {
             Error::happened(Error::Module::I2C, ERR_PORT_NOT_INITIALIZED, Error::Severity::CRITICAL);
@@ -738,20 +752,6 @@ namespace I2C {
 
         // Save the user handler
         _interruptHandlers[static_cast<int>(port)][static_cast<int>(interrupt)] = (uint32_t)handler;
-
-        // IER (Interrupt Enable Register) : enable the requested interrupt
-        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_IER))
-                = 1 << S_SR_TCOMP;
-
-        // Enable the interrupt in the NVIC
-        Core::Interrupt interruptChannel;
-        if (p->mode == Mode::MASTER) {
-            interruptChannel = _interruptChannelsMaster[static_cast<int>(port)];
-        } else {
-            interruptChannel = _interruptChannelsSlave[static_cast<int>(port)];
-        }
-        Core::setInterruptHandler(interruptChannel, interruptHandlerWrapper);
-        Core::enableInterrupt(interruptChannel, INTERRUPT_PRIORITY);
     }
 
     void interruptHandlerWrapper() {
@@ -767,16 +767,20 @@ namespace I2C {
         }
         const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
 
-        // Call the user handler for this interrupt
+        // Call the user handler corresponding to this interrupt
         void (*handler)() = nullptr;
         if ((*(volatile uint32_t*)(REG_BASE + OFFSET_S_SR)) & (1 << S_SR_TRA)) {
+            // Write finished
             handler = (void (*)())_interruptHandlers[static_cast<int>(port)][static_cast<int>(Interrupt::ASYNC_WRITE_FINISHED)];
             I2C::write(port, nullptr, 0, true);
             if (handler != nullptr) {
                 handler();
             }
+
         } else {
+            // Read finished
             handler = (void (*)())_interruptHandlers[static_cast<int>(port)][static_cast<int>(Interrupt::ASYNC_READ_FINISHED)];
+            //I2C::read(port, nullptr, 0, true);
             if (handler != nullptr) {
                 handler();
             }
