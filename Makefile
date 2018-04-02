@@ -64,10 +64,10 @@ PREPROC_DEFINES=-DPACKAGE=$(PACKAGE) $(PREPROC_DEFINE_BOOTLOADER) $(PREPROC_DEFI
 
 # Compilation flags
 # Note : do not use -O0, this might generate code too slow for some peripherals (notably the SPI controller)
-ifdef DEBUG
+ifeq ($(strip $(DEBUG)), true)
 	OPTFLAGS=-Og -g
 else
-	OPTFLAGS=-Os -flto -ffunction-sections -fdata-sections
+	OPTFLAGS=-Os -ffunction-sections -fdata-sections
 endif
 CXXFLAGS=$(ARCH_FLAGS) $(STARTUP_DEFS) \
 	-I$(ROOTDIR)/$(LIBNAME) \
@@ -83,7 +83,7 @@ ifdef BOOTLOADER
 	LDSCRIPTNAME=usercode_bootloader.ld
 endif
 LDSCRIPTS=-L$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) -L$(ROOTDIR)/$(LIBNAME) -L. -T $(LDSCRIPTNAME)
-ifdef CREATE_MAP
+ifeq ($(strip $(CREATE_MAP)), true)
 	MAP=-Wl,-Map=$(NAME).map
 endif
 LFLAGS=--specs=nano.specs --specs=nosys.specs $(LDSCRIPTS) -Wl,--gc-sections $(MAP)
