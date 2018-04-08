@@ -22,6 +22,7 @@ namespace TC {
 
     void execDelayedHandlerWrapper();
 
+    // Initialize a TC channel with the given period and hightime in microseconds
     void init(const Channel& channel, unsigned int period, unsigned int highTime, bool output) {
         uint32_t REG = TC_BASE + channel.tc * TC_SIZE + channel.subchannel * OFFSET_CHANNEL_SIZE;
 
@@ -79,7 +80,26 @@ namespace TC {
         }
     }
 
+    // Set the period in microseconds for both TIOA and TIOB of the specified channel
     void setPeriod(const Channel& channel, double period) {
+        unsigned int basePeriod = 80000000L / PM::getModuleClockFrequency(PM::CLK_TC0 + channel.tc);
+        setRC(channel, period * 10 / basePeriod);
+    }
+
+    // Set the high time of the specified channel in microseconds
+    void setHighTime(const Channel& channel, double highTime) {
+        unsigned int basePeriod = 80000000L / PM::getModuleClockFrequency(PM::CLK_TC0 + channel.tc);
+        setRX(channel, highTime * 10 / basePeriod);
+    }
+
+    void setDutyCycle(const Channel& channel, int percent) {
+        uint32_t REG = TC_BASE + channel.tc * TC_SIZE + channel.subchannel * OFFSET_CHANNEL_SIZE;
+        uint32_t rc = (*(volatile uint32_t*)(REG + OFFSET_RC0));
+        setRX(channel, rc * percent / 100);
+    }
+
+    // Set the RC register which defines the period for both TIOA and TIOB of the given channel
+    void setRC(const Channel& channel, uint16_t rc) {
         uint32_t REG = TC_BASE + channel.tc * TC_SIZE + channel.subchannel * OFFSET_CHANNEL_SIZE;
 
         // WPMR (Write Protect Mode Register) : disable write protect
@@ -88,8 +108,7 @@ namespace TC {
             | UNLOCK_KEY << WPMR_WPKEY; // WPKEY : write protect key
 
         // Set the signal period
-        unsigned int basePeriod = 80000000L / PM::getModuleClockFrequency(PM::CLK_TC0 + channel.tc);
-        (*(volatile uint32_t*)(REG + OFFSET_RC0)) = period * 10 / basePeriod;
+        (*(volatile uint32_t*)(REG + OFFSET_RC0)) = rc;
 
         // Software trigger
         (*(volatile uint32_t*)(REG + OFFSET_CCR0)) = 1 << CCR_SWTRG;
@@ -100,7 +119,8 @@ namespace TC {
             | UNLOCK_KEY << WPMR_WPKEY; // WPKEY : write protect key
     }
 
-    void setHighTime(const Channel& channel, double highTime) {
+    // Set the RA or RB register of the specified channel which defines the time at high state
+    void setRX(const Channel& channel, uint16_t rx) {
         uint32_t REG = TC_BASE + channel.tc * TC_SIZE + channel.subchannel * OFFSET_CHANNEL_SIZE;
 
         // WPMR (Write Protect Mode Register) : disable write protect
@@ -108,9 +128,35 @@ namespace TC {
             = 0 << WPMR_WPEN            // WPEN : write protect enabled
             | UNLOCK_KEY << WPMR_WPKEY; // WPKEY : write protect key
 
-        // Set the signal high time
-        unsigned int basePeriod = 80000000L / PM::getModuleClockFrequency(PM::CLK_TC0 + channel.tc);
-        (*(volatile uint32_t*)(REG + (channel.line == TIOB ? OFFSET_RB0 : OFFSET_RA0))) = highTime * 10 / basePeriod;
+        // If the channel compare register (RA or RB) is zero, the output will be set by the RC compare
+        // (CMR0.ACPC or CMR0.BCPC) but not immediately cleared by the RA/RB compare, and the line will
+        // stay high instead of staying low. To match the expected behaviour the CMR register need to be
+        // temporarily reconfigured to clear the output on RC compare.
+        // When quitting this edge case (current RA or RB is 0), the default behaviour must be reset.
+        // Depending on the case, the RA/RB value must be set either before of after configuring CMR.
+        if (rx == 0) {
+            // CMR (Channel Mode Register) : set RC compare over TIOA to 2
+            uint32_t cmr = (*(volatile uint32_t*)(REG + OFFSET_CMR0));
+            cmr &= ~(uint32_t)(0b11 << (channel.line == TIOB ? CMR_BCPC : CMR_ACPC));
+            cmr |= 2 << (channel.line == TIOB ? CMR_BCPC : CMR_ACPC);
+            (*(volatile uint32_t*)(REG + OFFSET_CMR0)) = cmr;
+
+            // Set the signal high time *after* configuring CMR
+            (*(volatile uint32_t*)(REG + (channel.line == TIOB ? OFFSET_RB0 : OFFSET_RA0))) = rx;
+            
+        } else if ((*(volatile uint32_t*)(REG + (channel.line == TIOB ? OFFSET_RB0 : OFFSET_RA0))) == 0) {
+            // Set the signal high time *before* configuring CMR
+            (*(volatile uint32_t*)(REG + (channel.line == TIOB ? OFFSET_RB0 : OFFSET_RA0))) = rx;
+
+            // CMR (Channel Mode Register) : set RC compare over TIOA to 2
+            uint32_t cmr = (*(volatile uint32_t*)(REG + OFFSET_CMR0));
+            cmr &= ~(uint32_t)(0b11 << (channel.line == TIOB ? CMR_BCPC : CMR_ACPC));
+            cmr |= 1 << (channel.line == TIOB ? CMR_BCPC : CMR_ACPC);
+            (*(volatile uint32_t*)(REG + OFFSET_CMR0)) = cmr;
+        } else {
+            // Set the signal high time
+            (*(volatile uint32_t*)(REG + (channel.line == TIOB ? OFFSET_RB0 : OFFSET_RA0))) = rx;
+        }
 
         // Software trigger
         //(*(volatile uint32_t*)(REG + OFFSET_CCR0)) = 1 << CCR_SWTRG;

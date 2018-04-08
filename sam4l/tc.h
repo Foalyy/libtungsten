@@ -130,11 +130,28 @@ namespace TC {
         CLK
     };
 
+    // Quick helpers for each channel
+    const Channel TC0_A0 = {TC::TC0, TC::CH0, TC::TIOA};
+    const Channel TC0_B0 = {TC::TC0, TC::CH0, TC::TIOB};
+    const Channel TC0_A1 = {TC::TC0, TC::CH1, TC::TIOA};
+    const Channel TC0_B1 = {TC::TC0, TC::CH1, TC::TIOB};
+    const Channel TC0_A2 = {TC::TC0, TC::CH2, TC::TIOA};
+    const Channel TC0_B2 = {TC::TC0, TC::CH2, TC::TIOB};
+    const Channel TC1_A0 = {TC::TC1, TC::CH0, TC::TIOA};
+    const Channel TC1_B0 = {TC::TC1, TC::CH0, TC::TIOB};
+    const Channel TC1_A1 = {TC::TC1, TC::CH1, TC::TIOA};
+    const Channel TC1_B1 = {TC::TC1, TC::CH1, TC::TIOB};
+    const Channel TC1_A2 = {TC::TC1, TC::CH2, TC::TIOA};
+    const Channel TC1_B2 = {TC::TC1, TC::CH2, TC::TIOB};
+
 
     // Module API
     void init(const Channel& channel, unsigned int period=0, unsigned int highTime=0, bool output=false);
     void setPeriod(const Channel& channel, double period);
     void setHighTime(const Channel& channel, double highTime);
+    void setDutyCycle(const Channel& channel, int percent);
+    void setRC(const Channel& channel, uint16_t rc);
+    void setRX(const Channel& channel, uint16_t rx);
     uint32_t getCounterValue(const Channel& channel);
     void wait(const Channel& channel, unsigned long value, Unit unit=Unit::MILLISECONDS);
     void execDelayed(const Channel& channel, void (*handler)(), unsigned long delay, bool repeat=false, Unit unit=Unit::MILLISECONDS);
