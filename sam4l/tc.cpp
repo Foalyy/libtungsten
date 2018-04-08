@@ -37,6 +37,10 @@ namespace TC {
             = 0 << WPMR_WPEN            // WPEN : write protect disabled
             | UNLOCK_KEY << WPMR_WPKEY; // WPKEY : write protect key
 
+        // CCR (Channel Control Register) : disable the clock
+        (*(volatile uint32_t*)(REG + OFFSET_CCR0))
+            = 1 << CCR_CLKDIS;       // CLKDIS : disable the clock
+
         // CMR (Channel Mode Register) : setup the channel in Waveform Generation Mode
         (*(volatile uint32_t*)(REG + OFFSET_CMR0))
             = 2 << CMR_TCCLKS       // TCCLKS : clock selection to PBA Clock / 8
@@ -54,14 +58,14 @@ namespace TC {
             | 1 << CMR_BCPC         // BCPC : RC/TIOB : set
             | 1 << CMR_BSWTRG;      // BSWTRG : SoftwareTrigger/TIOB : set
 
-        // Compute base period in tenths of microseconds
-        unsigned int basePeriod = 80000000L / PM::getModuleClockFrequency(PM::CLK_TC0 + channel.tc);
+        // Set the period and high time
+        setPeriod(channel, period);
+        setHighTime(channel, highTime);
 
-        // Compute timings :
-        // RC is the period of the signal (it resets the counter)
-        // RA and RB are the duty cycle of the signal for channels A and B
-        (*(volatile uint32_t*)(REG + OFFSET_RC0)) = period * 10 / basePeriod;
-        (*(volatile uint32_t*)(REG + (channel.line == TIOB ? OFFSET_RB0 : OFFSET_RA0))) = highTime * 10 / basePeriod;
+        // WPMR (Write Protect Mode Register) : disable write protect
+        (*(volatile uint32_t*)(TC_BASE + channel.tc * TC_SIZE + OFFSET_WPMR))
+            = 0 << WPMR_WPEN            // WPEN : write protect disabled
+            | UNLOCK_KEY << WPMR_WPKEY; // WPKEY : write protect key
 
         // CCR (Channel Control Register) : enable and start the clock
         (*(volatile uint32_t*)(REG + OFFSET_CCR0))
