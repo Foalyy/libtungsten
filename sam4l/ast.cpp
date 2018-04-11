@@ -10,6 +10,7 @@ namespace AST {
 
     // User handler for the Alarm interrupt
     void (*_alarmHandler)();
+    extern uint8_t INTERRUPT_PRIORITY;
 
 
     // Internal functions

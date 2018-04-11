@@ -89,7 +89,6 @@ namespace GPIO {
     // Interrupts handling
     const uint8_t N_GPIO_LINES = 96; // Max on the 100-pin package
     const uint8_t N_INTERRUPT_CHANNELS = N_GPIO_LINES / 8; // Each interrupt channel covers 8 GPIO lines
-    const uint8_t INTERRUPT_PRIORITY = 50;
     extern uint32_t portsState[]; // Used for rising(), falling() and changed()
     extern uint32_t interruptHandlers[];
 

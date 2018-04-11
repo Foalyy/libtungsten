@@ -123,7 +123,6 @@ namespace USART {
 
     const int BUFFER_SIZE = 256;
 
-    const uint8_t INTERRUPT_PRIORITY = 10;
 
     // Error codes
     const Error::Code ERR_BAUDRATE_OUT_OF_RANGE = 0x0001;

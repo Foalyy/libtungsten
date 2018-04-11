@@ -11,6 +11,7 @@ namespace DMA {
     ChannelConfig _channels[N_CHANNELS_MAX];
 
     // Interrupt handlers
+    extern uint8_t INTERRUPT_PRIORITY;
     uint32_t _interruptHandlers[N_CHANNELS_MAX][N_INTERRUPTS];
     const int _interruptBits[N_INTERRUPTS] = {ISR_RCZ, ISR_TRC, ISR_TERR};
     void interruptHandlerWrapper();

@@ -5,6 +5,7 @@
 namespace TRNG {
 
     // Interrupt handler
+    extern uint8_t INTERRUPT_PRIORITY;
     uint32_t _dataReadyHandler = 0;
     void interruptHandlerWrapper();
 

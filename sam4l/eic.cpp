@@ -12,6 +12,7 @@ namespace EIC {
     extern struct GPIO::Pin PINS[];
 
     // Handlers defined by the user
+    extern uint8_t INTERRUPT_PRIORITY;
     bool _initialized = false;
     uint32_t _interruptHandlers[N_CHANNELS - 1]; // -1 because channel 0 is the NMI
 

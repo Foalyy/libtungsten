@@ -24,7 +24,6 @@ namespace TRNG {
     const uint32_t CR_KEY = 0x524E47 << 8;
     const uint32_t ISR_DATRDY = 0;
 
-    const uint8_t INTERRUPT_PRIORITY = 10;
 
     void enable();
     bool available();

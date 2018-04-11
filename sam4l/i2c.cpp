@@ -26,6 +26,7 @@ namespace I2C {
     struct Channel ports[N_PORTS_M];
 
     // Interrupt handlers
+    extern uint8_t INTERRUPT_PRIORITY;
     uint32_t _interruptHandlers[N_PORTS_M][N_INTERRUPTS];
     Core::Interrupt _interruptChannelsMaster[] = {Core::Interrupt::TWIM0, Core::Interrupt::TWIM1, Core::Interrupt::TWIM2, Core::Interrupt::TWIM3};
     Core::Interrupt _interruptChannelsSlave[] = {Core::Interrupt::TWIS0, Core::Interrupt::TWIS1};

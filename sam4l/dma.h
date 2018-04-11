@@ -90,7 +90,6 @@ namespace DMA {
     };
 
     const int N_CHANNELS_MAX = 16;
-    const uint8_t INTERRUPT_PRIORITY = 8;
 
     // Module API
     int newChannel(Device device, uint32_t address, uint16_t length, Size size, bool ring=false);

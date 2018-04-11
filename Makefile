@@ -9,7 +9,7 @@ ifndef UTILS_MODULES
 	UTILS_MODULES=RingBuffer
 endif
 LIBNAME=libtungsten
-CORE_MODULES=pins_$(CHIP_FAMILY)_$(PACKAGE) core dma flash scif bscif pm bpm ast gpio usb error
+CORE_MODULES=pins_$(CHIP_FAMILY)_$(PACKAGE) interrupt_priorities core dma flash scif bscif pm bpm ast gpio usb error
 LIB_MODULES=$(CORE_MODULES) $(MODULES)
 LIB_OBJS=$(addprefix $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/,$(addsuffix .o,$(LIB_MODULES)))
 UTILS_OBJS=$(addprefix $(ROOTDIR)/$(LIBNAME)/utils/,$(addsuffix .o,$(UTILS_MODULES)))
@@ -123,7 +123,7 @@ $(NAME).hex: $(NAME).elf
 	$(OBJCOPY) -O ihex $^ $@
 
 # Compile library
-$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.o: $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.cpp $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.h
+$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.o: $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.cpp $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.h $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/pins_$(CHIP_FAMILY)_$(PACKAGE).cpp $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/interrupt_priorities.cpp
 	$(CXX) $(CXXFLAGS) $(LFLAGS) -c $< -o $@
 
 # Compile other modules

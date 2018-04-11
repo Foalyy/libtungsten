@@ -10,6 +10,7 @@ namespace TC {
     extern struct GPIO::Pin PINS_CLK[MAX_N_TC][N_CHANNELS * N_LINES];
 
     // Internal list of delayed callbacks to execute
+    extern uint8_t INTERRUPT_PRIORITY;
     struct ExecDelayedData {
         uint32_t handler;
         int counter;

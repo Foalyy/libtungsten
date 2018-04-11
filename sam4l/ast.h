@@ -51,9 +51,6 @@ namespace AST {
     const uint32_t DTR_ADD = 5;
     const uint32_t DTR_VALUE = 8;
 
-    // Priority for the interrupts of this module
-    const uint8_t INTERRUPT_PRIORITY = 10;
-
     using Time = volatile uint64_t;
     extern Time _currentTimeHighBytes;
 

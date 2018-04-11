@@ -352,8 +352,6 @@ namespace USB {
     extern const struct GPIO::Pin PIN_DM;
     extern const struct GPIO::Pin PIN_DP;
 
-    const uint8_t INTERRUPT_PRIORITY = 5;
-
 
     // Module API
     void initDevice();

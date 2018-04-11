@@ -117,8 +117,6 @@ namespace TC {
     const uint8_t N_CHANNELS = 3;
     const uint8_t N_LINES = 2;
 
-    const uint8_t INTERRUPT_PRIORITY = 50;
-
     struct Channel {
         uint8_t tc;
         uint8_t subchannel;

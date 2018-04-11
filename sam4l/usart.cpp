@@ -13,6 +13,7 @@ namespace USART {
     const int PM_CLK[] = {PM::CLK_USART0, PM::CLK_USART1, PM::CLK_USART2, PM::CLK_USART3};
 
     // Interrupt handlers
+    extern uint8_t INTERRUPT_PRIORITY;
     uint32_t _interruptHandlers[N_PORTS][N_INTERRUPTS];
     const int _interruptBits[N_INTERRUPTS] = {CSR_RXRDY, CSR_TXRDY, CSR_OVRE, CSR_PARE};
     void interruptHandlerWrapper();

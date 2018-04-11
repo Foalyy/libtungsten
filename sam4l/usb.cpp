@@ -104,6 +104,8 @@ namespace USB {
         }
     };
 
+    extern uint8_t INTERRUPT_PRIORITY;
+
     // User handlers
     void (*_connectedHandler)() = nullptr;
     void (*_disconnectedHandler)() = nullptr;

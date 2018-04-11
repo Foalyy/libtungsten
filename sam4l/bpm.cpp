@@ -10,6 +10,7 @@ namespace BPM {
     PowerScaling _currentPS = PowerScaling::PS0;
 
     // Interrupt handlers
+    extern uint8_t INTERRUPT_PRIORITY;
     uint32_t _interruptHandlers[N_INTERRUPTS];
     const int _interruptBits[N_INTERRUPTS] = {SR_PSOK};
     void interruptHandlerWrapper();

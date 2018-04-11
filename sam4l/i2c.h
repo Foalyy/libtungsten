@@ -171,8 +171,6 @@ namespace I2C {
     const Error::Code ERR_PORT_NOT_INITIALIZED = 3;
     const Error::Code ERR_TIMEOUT = 4;
 
-    const uint8_t INTERRUPT_PRIORITY = 8;
-
 
     // Common functions
     void disable(Port port);

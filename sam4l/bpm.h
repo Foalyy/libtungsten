@@ -45,9 +45,6 @@ namespace BPM {
     // Error codes
     const Error::Code ERR_UNKNOWN_BACKUP_WAKEUP_CAUSE = 0x0001;
 
-    const uint8_t INTERRUPT_PRIORITY = 10;
-
-
     // Constants
     enum class PowerScaling {
         PS0 = 0,

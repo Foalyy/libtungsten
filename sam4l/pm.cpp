@@ -12,6 +12,7 @@ namespace PM {
     unsigned long _pbaClockFrequency = RCSYS_FREQUENCY;
 
     // Interrupt handlers
+    extern uint8_t INTERRUPT_PRIORITY;
     uint32_t _interruptHandlers[N_INTERRUPTS];
     const int _interruptBits[N_INTERRUPTS] = {SR_CFD, SR_CKRDY, SR_WAKE};
     void interruptHandlerWrapper();

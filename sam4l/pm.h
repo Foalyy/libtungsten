@@ -131,7 +131,6 @@ namespace PM {
     const int CLK_TRNG = PBAMASK + PBAMASK_TRNG;
     const int CLK_USB = PBBMASK + PBBMASK_USBC;
 
-    const uint8_t INTERRUPT_PRIORITY = 10;
 
     // The main clock is used by the CPU and the peripheral buses
     // and can be connected to any of these clock sources

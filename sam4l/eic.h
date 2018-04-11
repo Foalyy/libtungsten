@@ -37,8 +37,6 @@ namespace EIC {
     // Error codes
     const Error::Code ERR_UNKNOWN_CHANNEL = 0x0001;
 
-    const uint8_t INTERRUPT_PRIORITY = 10;
-
     enum class Mode {
         EDGE = 0,
         LEVEL = 1,

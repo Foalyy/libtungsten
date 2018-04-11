@@ -5,6 +5,7 @@
 
 namespace GPIO {
 
+    extern uint8_t INTERRUPT_PRIORITY;
     uint32_t _interruptHandlers[N_GPIO_LINES];
     uint32_t _portsState[N_PORTS];
 
