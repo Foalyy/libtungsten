@@ -16,7 +16,7 @@ namespace DMA {
     const int _interruptBits[N_INTERRUPTS] = {ISR_RCZ, ISR_TRC, ISR_TERR};
     void interruptHandlerWrapper();
 
-    int newChannel(Device device, uint32_t address, uint16_t length, Size size, bool ring) {
+    int newChannel(Device device, Size size, uint32_t address, uint16_t length, bool ring) {
         // Check that there is an available channel
         if (_nChannels == N_CHANNELS_MAX) {
             Error::happened(Error::Module::DMA, ERR_NO_CHANNEL_AVAILABLE, Error::Severity::CRITICAL);
@@ -82,7 +82,7 @@ namespace DMA {
         }
     }
 
-    void startChannel(int channel, uint32_t address, uint16_t length, bool start) {
+    void setupChannel(int channel, uint32_t address, uint16_t length) {
         // Check that this channel exists
         if (channel >= _nChannels) {
             Error::happened(Error::Module::DMA, ERR_CHANNEL_NOT_INITIALIZED, Error::Severity::CRITICAL);
@@ -91,24 +91,13 @@ namespace DMA {
         
         const uint32_t REG_BASE = BASE + channel * CHANNEL_REG_SIZE;
 
-        // Empty TCR to prevent a race condition
+        // Empty TCR and disable the transfer
         (*(volatile uint32_t*)(REG_BASE + OFFSET_TCR)) = 0;
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_CR)) = 1 << CR_TDIS; // Disable transfer
 
-        // Configure and enable this channel
-        _channels[channel].started = start;
-        if (start) {
-            (*(volatile uint32_t*)(REG_BASE + OFFSET_CR)) = 1 << CR_TEN;  // Enable transfer (as soon as TCR is written > 0)
-        } else {
-            (*(volatile uint32_t*)(REG_BASE + OFFSET_CR)) = 1 << CR_TDIS; // Disable transfer
-        }
+        // Configure this channel
         (*(volatile uint32_t*)(REG_BASE + OFFSET_MAR)) = address;   // Buffer memory address
         (*(volatile uint32_t*)(REG_BASE + OFFSET_TCR)) = length;    // Buffer length
-
-        // Reenable interrupts if necessary
-        if (start && _channels[channel].interruptsEnabled) {
-            Core::Interrupt interruptChannel = static_cast<Core::Interrupt>(static_cast<int>(Core::Interrupt::DMA0) + channel);
-            Core::enableInterrupt(interruptChannel, INTERRUPT_PRIORITY);
-        }
     }
 
     void startChannel(int channel) {
@@ -128,6 +117,11 @@ namespace DMA {
             Core::Interrupt interruptChannel = static_cast<Core::Interrupt>(static_cast<int>(Core::Interrupt::DMA0) + channel);
             Core::enableInterrupt(interruptChannel, INTERRUPT_PRIORITY);
         }
+    }
+
+    void startChannel(int channel, uint32_t address, uint16_t length) {
+        setupChannel(channel, address, length);
+        startChannel(channel);
     }
 
     void reloadChannel(int channel, uint32_t address, uint16_t length) {

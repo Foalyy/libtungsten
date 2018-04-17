@@ -152,22 +152,6 @@ namespace I2C {
             = 1 << M_CR_MEN;          // MEN : Master Enable
 
         // CWGR (Clock Waveform Generator Register) : setup the SCL (clock) line
-        // First, compute the base period of the correctly prescaled clock
-        // Then, compute the counters based on this period
-        // To respect the 100kHz frequency, t(HIGH) + t(HD_DATA) + t(LOW) + t(SU_DATA) = 10µs must be respected
-        /*unsigned int prescalerExp = 1; // Prescaler factor : 2**(EXP + 1) => clock is divided by 4
-        unsigned int t = 1000000000UL / (PM::getModuleClockFrequency(PM_CLK_M[static_cast<int>(port)]) / 4); // Base period in ns
-        unsigned int high = 400 / t; // HIGH : 4µs
-        unsigned int low = 400 / t; // LOW : 4µs
-        unsigned int data = 100 / t; // DATA : 1µs each for HD_DATA and SU_DATA
-        unsigned int stasto = 200 / t; // START/STOP : 2µs
-        (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CWGR))
-            = low << M_CWGR_LOW           // LOW : low and buffer counter
-            | high << M_CWGR_HIGH         // HIGH : high counter
-            | stasto << M_CWGR_STASTO     // STASTO : start/stop counters
-            | data << M_CWGR_DATA         // DATA : data time counter
-            | prescalerExp << M_CWGR_EXP; // EXP : clock prescaler*/
-
         _frequency = frequency;
         unsigned long fPrescaler = PM::getModuleClockFrequency(PM_CLK_M[static_cast<int>(port)]) / 2; // Prescaler at EXP=0 divides the freq. by 2
         unsigned int periods = fPrescaler / frequency;
@@ -190,12 +174,10 @@ namespace I2C {
 
         // Set up the DMA channels and related interrupts
         if (p->rxDMAChannel == -1) {
-            p->rxDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_M_RX) + static_cast<int>(port)), 
-                    (uint32_t)(p->buffer), BUFFER_SIZE, DMA::Size::BYTE);
+            p->rxDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_M_RX) + static_cast<int>(port)), DMA::Size::BYTE);
         }
         if (p->txDMAChannel == -1) {
-            p->txDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_M_TX) + static_cast<int>(port)),
-                    (uint32_t)(p->buffer), BUFFER_SIZE, DMA::Size::BYTE);
+            p->txDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_M_TX) + static_cast<int>(port)), DMA::Size::BYTE);
         }
 
         return true;
@@ -544,23 +526,22 @@ namespace I2C {
         (*(volatile uint32_t*)(REG_BASE + OFFSET_S_NBYTES)) = 0;
 
         // Set up the DMA channels and related interrupts
-        p->rxDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_S_RX) + static_cast<int>(port)), 
-                (uint32_t)(p->buffer), BUFFER_SIZE, DMA::Size::BYTE);
-        p->txDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_S_TX) + static_cast<int>(port)),
-                (uint32_t)(p->buffer), BUFFER_SIZE, DMA::Size::BYTE);
+        p->rxDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_S_RX) + static_cast<int>(port)), DMA::Size::BYTE);
+        p->txDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_S_TX) + static_cast<int>(port)), DMA::Size::BYTE);
 
-        // IER (Interrupt Enable Register) : enable the Transfer Complete interrupt
+        // IER (Interrupt Enable Register) : enable the Transfer Complete, Overrun and Underrun interrupts
         (*(volatile uint32_t*)(REG_BASE + OFFSET_S_IER))
-                = 1 << S_SR_TCOMP;
+                = 1 << S_SR_TCOMP
+                | 1 << S_SR_URUN
+                | 1 << S_SR_ORUN;
 
         // Enable the interrupt in the NVIC
         Core::Interrupt interruptChannel = _interruptChannelsSlave[static_cast<int>(port)];
         Core::setInterruptHandler(interruptChannel, interruptHandlerWrapper);
         Core::enableInterrupt(interruptChannel, INTERRUPT_PRIORITY);
 
-        // Initialize the slave with an empty read and write
-        //I2C::read(port, nullptr, 0, true);
-        I2C::write(port, nullptr, 0, true);
+        // Initialize the slave with an empty write
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_THR)) = 0xFF;
 
         return true;
     }
@@ -626,14 +607,11 @@ namespace I2C {
 
         // Empty transfer
         if (n == 0 || buffer == nullptr) {
-            // Copy the first byte to THR to overwrite any previous byte waiting to be sent
+            // Copy a dummy byte to THR to overwrite any previous byte waiting to be sent
             (*(volatile uint32_t*)(REG_BASE + OFFSET_S_THR)) = 0xFF;
 
             // Clear every status
             (*(volatile uint32_t*)(REG_BASE + OFFSET_S_SCR)) = 0xFFFFFFFF;
-
-            // Start the DMA
-            DMA::startChannel(p->txDMAChannel, (uint32_t)(p->buffer), 0);
 
         } else {
             // Write at most BUFFER_SIZE - 1 + 1 = BUFFER_SIZE characters into the port buffer : 
@@ -768,28 +746,50 @@ namespace I2C {
         }
         const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
 
-        // Call the user handler corresponding to this interrupt
-        void (*handler)() = nullptr;
-        if ((*(volatile uint32_t*)(REG_BASE + OFFSET_S_SR)) & (1 << S_SR_TRA)) {
-            // Write finished
-            handler = (void (*)())_interruptHandlers[static_cast<int>(port)][static_cast<int>(Interrupt::ASYNC_WRITE_FINISHED)];
-            I2C::write(port, nullptr, 0, true);
-            if (handler != nullptr) {
-                handler();
-            }
+        // URUN : underrun
+        if ((*(volatile uint32_t*)(REG_BASE + OFFSET_S_SR)) & (1 << S_SR_URUN)) {
+            // Write a dummy byte in THR to make sure the peripheral will not block
+            // the bus waiting for data to transmit
+            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_THR)) = 0xFB;
 
-        } else {
-            // Read finished
-            handler = (void (*)())_interruptHandlers[static_cast<int>(port)][static_cast<int>(Interrupt::ASYNC_READ_FINISHED)];
-            //I2C::read(port, nullptr, 0, true);
-            if (handler != nullptr) {
-                handler();
-            }
+            // SCR (Status Clear Register) : clear the interrupt
+            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_SCR))
+                = 1 << S_SR_URUN;
         }
 
-        // SCR (Status Clear Register) : clear the interrupt
-        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_SCR))
+        // ORUN : overrun
+        if ((*(volatile uint32_t*)(REG_BASE + OFFSET_S_SR)) & (1 << S_SR_ORUN)) {
+            // Dummy read from RHR to make sure the peripheral will not block
+            // the bus waiting for the received data to be handled
+            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_RHR));
+
+            // SCR (Status Clear Register) : clear the interrupt
+            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_SCR))
+                = 1 << S_SR_ORUN;
+        }
+
+        // TCOMP : Transfer Complete
+        if ((*(volatile uint32_t*)(REG_BASE + OFFSET_S_SR)) & (1 << S_SR_TCOMP)) {
+            // Call the user handler corresponding to this interrupt
+            void (*handler)() = nullptr;
+            if ((*(volatile uint32_t*)(REG_BASE + OFFSET_S_SR)) & (1 << S_SR_TRA)) {
+                // Write finished
+                handler = (void (*)())_interruptHandlers[static_cast<int>(port)][static_cast<int>(Interrupt::ASYNC_WRITE_FINISHED)];
+                if (handler != nullptr) {
+                    handler();
+                }
+
+            } else {
+                // Read finished
+                handler = (void (*)())_interruptHandlers[static_cast<int>(port)][static_cast<int>(Interrupt::ASYNC_READ_FINISHED)];
+                if (handler != nullptr) {
+                    handler();
+                }
+            }
+            // SCR (Status Clear Register) : clear the interrupt
+            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_SCR))
                 = 1 << S_SR_TCOMP;
+        }
     }
 
     // Advanced function which returns the raw Status Register.

@@ -63,8 +63,8 @@ namespace SPI {
             = 1 << CR_SPIEN;        // SPIEN : SPI Enable
 
         // Set up the DMA channels and related interrupts
-        _rxDMAChannel = DMA::newChannel(DMA::Device::SPI_RX, 0x00, 0, DMA::Size::BYTE);
-        _txDMAChannel = DMA::newChannel(DMA::Device::SPI_TX, 0x00, 0, DMA::Size::BYTE);
+        _rxDMAChannel = DMA::newChannel(DMA::Device::SPI_RX, DMA::Size::BYTE);
+        _txDMAChannel = DMA::newChannel(DMA::Device::SPI_TX, DMA::Size::BYTE);
     }
 
     void disableMaster() {
@@ -210,7 +210,7 @@ namespace SPI {
         // If the user asked to have more bytes received than sent, send dummy bytes
         } else if (sizeRx > size) {
             // Configure Tx DMA channel without starting it
-            DMA::startChannel(_txDMAChannel, (uint32_t)txBuffer, size, false);
+            DMA::setupChannel(_txDMAChannel, (uint32_t)txBuffer, size);
 
             // After the channel has finished, reload it with some dummy bytes
             int dummySize = DUMMY_BYTES_SIZE;

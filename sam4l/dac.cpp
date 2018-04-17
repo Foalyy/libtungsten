@@ -40,7 +40,7 @@ namespace DAC {
             = WPMR_WPKEY
             | 1 << WPMR_WPEN;
 
-        _dmaChannel = DMA::newChannel(DMA::Device::DAC, 0, 0, DMA::Size::HALFWORD);
+        _dmaChannel = DMA::newChannel(DMA::Device::DAC, DMA::Size::HALFWORD);
 
         _enabled = true;
     }
