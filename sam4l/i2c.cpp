@@ -47,81 +47,8 @@ namespace I2C {
     unsigned int _frequency = 0;
 
 
-    // Common initialisation code shared between Master and Slave modes
-    void enable(Port port) {
-        struct Channel* p = &(ports[static_cast<int>(port)]);
 
-        // Initialize the buffer
-        for (int i = 0; i < BUFFER_SIZE; i++) {
-            p->buffer[i] = 0;
-        }
-
-        // Set the pins in peripheral mode
-        GPIO::enablePeripheral(PINS_SDA[static_cast<int>(port)]);
-        GPIO::enablePeripheral(PINS_SCL[static_cast<int>(port)]);
-
-        // Initialize interrupt handlers
-        for (int i = 0; i < N_INTERRUPTS; i++) {
-            _interruptHandlers[static_cast<int>(port)][i] = (uint32_t)nullptr;
-        }
-    }
-
-    void disable(Port port) {
-        const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
-        struct Channel* p = &(ports[static_cast<int>(port)]);
-        
-        // Free the pins in peripheral mode
-        GPIO::disablePeripheral(PINS_SDA[static_cast<int>(port)]);
-        GPIO::disablePeripheral(PINS_SCL[static_cast<int>(port)]);
-
-        // Stop the DMA channels
-        DMA::stopChannel(p->txDMAChannel);
-        DMA::stopChannel(p->rxDMAChannel);
-
-        if (p->mode == Mode::MASTER) {
-            // CR (Control Register) : disable the master interface
-            (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR)) = 0;
-
-            // Disable the clock
-            PM::disablePeripheralClock(PM_CLK_M[static_cast<int>(port)]);
-
-        } else if (p->mode == Mode::MASTER) {
-            // CR (Control Register) : disable the master interface
-            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_CR)) = 0;
-
-            // Disable the clock
-            PM::disablePeripheralClock(PM_CLK_M[static_cast<int>(port)]);
-        }
-
-        p->mode = Mode::NONE;
-    }
-
-    void reset(Port port) {
-        const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
-        struct Channel* p = &(ports[static_cast<int>(port)]);
-
-        if (p->mode == Mode::MASTER) {
-            // CR (Control Register) : reset the interface
-            (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
-                = 1 << M_CR_SWRST;        // SWRST : software reset
-
-            // CR (Control Register) : enable the master interface
-            (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
-                = 1 << M_CR_MEN;          // MEN : Master Enable
-
-        } else if (p->mode == Mode::SLAVE) {
-            // CR (Control Register) : reset the interface
-            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_CR))
-                = 1 << S_CR_SWRST;        // SWRST : software reset
-
-            // CR (Control Register) : enable the slave interface
-            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_CR))
-                = 1 << S_CR_SEN;          // SEN : Slave Enable
-        }
-    }
-
-
-    // Master functions
+    // MASTER MODE
 
     bool enableMaster(Port port, unsigned int frequency) {
         if (static_cast<int>(port) > N_PORTS_M) {
@@ -136,9 +63,16 @@ namespace I2C {
             (*(volatile uint32_t*)(REG_BASE + OFFSET_S_CR)) = 0;
         }
         p->mode = Mode::MASTER;
-        
-        // Common initialization
-        enable(port);
+
+        // Initialize the buffer
+        for (int i = 0; i < BUFFER_SIZE; i++) {
+            p->buffer[i] = 0;
+        }
+
+        // Initialize interrupt handlers
+        for (int i = 0; i < N_INTERRUPTS; i++) {
+            _interruptHandlers[static_cast<int>(port)][i] = (uint32_t)nullptr;
+        }
 
         // Enable the clock
         PM::enablePeripheralClock(PM_CLK_M[static_cast<int>(port)]);
@@ -161,14 +95,14 @@ namespace I2C {
             | t << M_CWGR_HIGH     // HIGH : high counter
             | t << M_CWGR_STASTO   // STASTO : start/stop counters
             | 1 << M_CWGR_DATA     // DATA : data time counter
-            | 0 << M_CWGR_EXP; // EXP : clock prescaler
+            | 0 << M_CWGR_EXP;     // EXP : clock prescaler
 
         // SRR (Slew Rate Register) : setup the lines
         // See Electrical Characteristics in the datasheet for more details
         (*(volatile uint32_t*)(REG_BASE + OFFSET_M_SRR))
-            = 0 << M_SRR_DADRIVEL
+            = 3 << M_SRR_DADRIVEL
             | 0 << M_SRR_DASLEW
-            | 0 << M_SRR_CLDRIVEL
+            | 3 << M_SRR_CLDRIVEL
             | 0 << M_SRR_CLSLEW
             | 2 << M_SRR_FILTER;
 
@@ -179,6 +113,10 @@ namespace I2C {
         if (p->txDMAChannel == -1) {
             p->txDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_M_TX) + static_cast<int>(port)), DMA::Size::BYTE);
         }
+
+        // Set the pins in peripheral mode
+        GPIO::enablePeripheral(PINS_SDA[static_cast<int>(port)]);
+        GPIO::enablePeripheral(PINS_SCL[static_cast<int>(port)]);
 
         return true;
     }
@@ -196,7 +134,6 @@ namespace I2C {
         const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
         if ((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & (1 << M_SR_ARBLST)) {
             Error::happened(Error::Module::I2C, WARN_ARBITRATION_LOST, Error::Severity::WARNING);
-            reset(port);
             (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CMDR)) = 0;
             (*(volatile uint32_t*)(REG_BASE + OFFSET_M_SCR)) = 1 << M_SR_ARBLST;
             return true;
@@ -477,7 +414,12 @@ namespace I2C {
     }
 
 
-    // Slave functions
+
+
+
+
+
+    // SLAVE MODE
 
     bool enableSlave(Port port, uint8_t address) {
         if (static_cast<int>(port) > N_PORTS_S) {
@@ -494,9 +436,16 @@ namespace I2C {
                 | 1 << M_CR_STOP;
         }
         p->mode = Mode::SLAVE;
-        
-        // Common initialization
-        enable(port);
+
+        // Initialize the buffer
+        for (int i = 0; i < BUFFER_SIZE; i++) {
+            p->buffer[i] = 0;
+        }
+
+        // Initialize interrupt handlers
+        for (int i = 0; i < N_INTERRUPTS; i++) {
+            _interruptHandlers[static_cast<int>(port)][i] = (uint32_t)nullptr;
+        }
 
         // Enable the clock
         PM::enablePeripheralClock(PM_CLK_S[static_cast<int>(port)]);
@@ -525,9 +474,16 @@ namespace I2C {
         // NBYTES : reset the bytes counter
         (*(volatile uint32_t*)(REG_BASE + OFFSET_S_NBYTES)) = 0;
 
-        // Set up the DMA channels and related interrupts
+        // Set up the DMA channels
         p->rxDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_S_RX) + static_cast<int>(port)), DMA::Size::BYTE);
         p->txDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_S_TX) + static_cast<int>(port)), DMA::Size::BYTE);
+
+        // SRR (Slew Rate Register) : setup the lines
+        // See Electrical Characteristics in the datasheet for more details
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_S_SRR))
+            = 3 << S_SRR_DADRIVEL
+            | 0 << S_SRR_DASLEW
+            | 2 << S_SRR_FILTER;
 
         // IER (Interrupt Enable Register) : enable the Transfer Complete, Overrun and Underrun interrupts
         (*(volatile uint32_t*)(REG_BASE + OFFSET_S_IER))
@@ -542,6 +498,10 @@ namespace I2C {
 
         // Initialize the slave with an empty write
         (*(volatile uint32_t*)(REG_BASE + OFFSET_S_THR)) = 0xFF;
+
+        // Set the pins in peripheral mode
+        GPIO::enablePeripheral(PINS_SDA[static_cast<int>(port)]);
+        GPIO::enablePeripheral(PINS_SCL[static_cast<int>(port)]);
 
         return true;
     }
@@ -790,6 +750,48 @@ namespace I2C {
             (*(volatile uint32_t*)(REG_BASE + OFFSET_S_SCR))
                 = 1 << S_SR_TCOMP;
         }
+    }
+
+
+    // COMMON TO MASTER AND SLAVE MODE
+
+    // Disable the port and release its ressources
+    void disable(Port port) {
+        const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
+        struct Channel* p = &(ports[static_cast<int>(port)]);
+        
+        // Free the pins in peripheral mode
+        GPIO::disablePeripheral(PINS_SDA[static_cast<int>(port)]);
+        GPIO::disablePeripheral(PINS_SCL[static_cast<int>(port)]);
+
+        // Stop the DMA channels
+        DMA::stopChannel(p->txDMAChannel);
+        DMA::stopChannel(p->rxDMAChannel);
+
+        if (p->mode == Mode::MASTER) {
+            // Disable the interrupt in the NVIC
+            Core::Interrupt interruptChannel = _interruptChannelsMaster[static_cast<int>(port)];
+            Core::disableInterrupt(interruptChannel);
+
+            // CR (Control Register) : disable the master interface
+            (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR)) = 0;
+
+            // Disable the clock
+            PM::disablePeripheralClock(PM_CLK_M[static_cast<int>(port)]);
+
+        } else if (p->mode == Mode::MASTER) {
+            // Disable the interrupt in the NVIC
+            Core::Interrupt interruptChannel = _interruptChannelsSlave[static_cast<int>(port)];
+            Core::disableInterrupt(interruptChannel);
+
+            // CR (Control Register) : disable the master interface
+            (*(volatile uint32_t*)(REG_BASE + OFFSET_S_CR)) = 0;
+
+            // Disable the clock
+            PM::disablePeripheralClock(PM_CLK_M[static_cast<int>(port)]);
+        }
+
+        p->mode = Mode::NONE;
     }
 
     // Advanced function which returns the raw Status Register.

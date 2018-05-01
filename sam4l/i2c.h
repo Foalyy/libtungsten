@@ -134,6 +134,9 @@ namespace I2C {
     const uint8_t S_SR_STO = 21;
     const uint8_t S_SR_REP = 22;
     const uint8_t S_SR_BTF = 23;
+    const uint8_t S_SRR_DADRIVEL = 0;
+    const uint8_t S_SRR_DASLEW = 8;
+    const uint8_t S_SRR_FILTER = 28;
     
     // Ports
     const int N_PORTS_M = 4;
@@ -156,7 +159,7 @@ namespace I2C {
     };
 
     // Timeout for transfer operations
-    const int TIMEOUT = 3000; // ms
+    const int TIMEOUT = 1000; // ms
 
     // Interrupts
     const int N_INTERRUPTS = 2;
