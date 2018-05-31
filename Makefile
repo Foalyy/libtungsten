@@ -1,26 +1,16 @@
-# Library
+# Default config
 ifndef ROOTDIR
 	ROOTDIR=.
 endif
-ifndef MODULES
-	MODULES=adc dac eic gloc i2c spi tc trng usart wdt
-endif
-ifndef UTILS_MODULES
-	UTILS_MODULES=RingBuffer
-endif
-LIBNAME=libtungsten
-CORE_MODULES=pins_$(CHIP_FAMILY)_$(PACKAGE) interrupt_priorities core dma flash scif bscif pm bpm ast gpio usb error
-LIB_MODULES=$(CORE_MODULES) $(MODULES)
-LIB_OBJS=$(addprefix $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/,$(addsuffix .o,$(LIB_MODULES)))
-UTILS_OBJS=$(addprefix $(ROOTDIR)/$(LIBNAME)/utils/,$(addsuffix .o,$(UTILS_MODULES)))
-EXT_OBJS=$(addsuffix .o,$(EXT_MODULES))
-
-# Default options
 ifndef CORTEX_M
 	CORTEX_M=4
 endif
 ifndef CHIP_FAMILY
 	CHIP_FAMILY=sam4l
+endif
+ifndef CHIP_MODEL
+	# ls2x, ls4x or ls8x, indicates the quantity of memory (see datasheet 2.2 Configuration Summary)
+	CHIP_MODEL=ls8x
 endif
 ifndef PACKAGE
 	PACKAGE=64
@@ -28,42 +18,56 @@ endif
 ifndef OPENOCD_CFG
 	OPENOCD_CFG=$(ROOTDIR)/$(LIBNAME)/openocd.cfg
 endif
-
-# Serial port
+ifndef CARBIDE
+	CARBIDE=false
+endif
+ifndef DEBUG
+	DEBUG=false
+endif
+ifndef BOOTLOADER
+	BOOTLOADER=false
+endif
+ifndef CREATE_MAP
+	CREATE_MAP=false
+endif
 ifndef SERIAL_PORT
 	SERIAL_PORT=/dev/ttyACM0
 endif
 
-# Carbide
-ifdef CARBIDE
-	LIB_OBJS+=libtungsten/carbide.o
+# Library
+LIBNAME=libtungsten
+CORE_MODULES=pins_$(CHIP_FAMILY)_$(PACKAGE) interrupt_priorities core dma flash scif bscif pm bpm ast gpio usb error
+LIB_MODULES=$(CORE_MODULES) $(MODULES)
+
+# Compilation objects
+LIB_OBJS=$(addprefix $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/,$(addsuffix .o,$(LIB_MODULES)))
+UTILS_OBJS=$(addprefix $(ROOTDIR)/$(LIBNAME)/utils/,$(addsuffix .o,$(UTILS_MODULES)))
+USER_OBJS=$(addsuffix .o,$(USER_MODULES))
+
+# Carbide-specific options
+ifeq ($(strip $(CARBIDE)), true)
+	LIB_OBJS+=libtungsten/carbide/carbide.o
 	PACKAGE=64
 endif
 
-# Compiler & linker
+# Toolchain
 CXX=$(TOOLCHAIN_PATH)arm-none-eabi-g++
 OBJCOPY=$(TOOLCHAIN_PATH)arm-none-eabi-objcopy
 GDB=$(TOOLCHAIN_PATH)arm-none-eabi-gdb
 SIZE=$(TOOLCHAIN_PATH)arm-none-eabi-size
 OPENOCD=openocd
 
-# Options for specific architecture
+# Architecture options
 ARCH_FLAGS=-mthumb -mcpu=cortex-m$(CORTEX_M)
 
 # Startup code
-STARTUP=$(ROOTDIR)/$(LIBNAME)/startup.cpp
+STARTUP=$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/startup.cpp
 
 # Defines passed to the preprocessor using -D
-ifdef BOOTLOADER
-	PREPROC_DEFINE_BOOTLOADER=-DBOOTLOADER=$(BOOTLOADER)
-endif
-ifdef DEBUG
-	PREPROC_DEFINE_DEBUG=-DDEBUG=$(DEBUG)
-endif
-PREPROC_DEFINES=-DPACKAGE=$(PACKAGE) $(PREPROC_DEFINE_BOOTLOADER) $(PREPROC_DEFINE_DEBUG)
+PREPROC_DEFINES=-DPACKAGE=$(PACKAGE) -DBOOTLOADER=$(BOOTLOADER) -DDEBUG=$(DEBUG)
 
 # Compilation flags
-# Note : do not use -O0, this might generate code too slow for some peripherals (notably the SPI controller)
+# Note : do not use -O0, as this might generate code too slow for some peripherals (notably the SPI controller)
 ifeq ($(strip $(DEBUG)), true)
 	OPTFLAGS=-Og -g
 else
@@ -73,20 +77,20 @@ CXXFLAGS=$(ARCH_FLAGS) $(STARTUP_DEFS) \
 	-I$(ROOTDIR)/$(LIBNAME) \
 	-I$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) \
 	-I$(ROOTDIR)/$(LIBNAME)/utils \
+	-I$(ROOTDIR)/$(LIBNAME)/carbide \
 	-std=c++11 -Wall $(OPTFLAGS) $(PREPROC_DEFINES) $(ADD_CXXFLAGS)
 
 # Linking flags
-ifndef LDSCRIPTNAME
-	LDSCRIPTNAME=usercode.ld
+ifndef LD_SCRIPT_NAME
+	LD_SCRIPT_NAME=usercode_$(CHIP_MODEL).ld
+	ifeq ($(strip $(BOOTLOADER)), true)
+		LD_SCRIPT_NAME=usercode_bootloader_$(CHIP_MODEL).ld
+	endif
 endif
-ifdef BOOTLOADER
-	LDSCRIPTNAME=usercode_bootloader.ld
-endif
-LDSCRIPTS=-L$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) -L$(ROOTDIR)/$(LIBNAME) -L. -T $(LDSCRIPTNAME)
 ifeq ($(strip $(CREATE_MAP)), true)
 	MAP=-Wl,-Map=$(NAME).map
 endif
-LFLAGS=--specs=nano.specs --specs=nosys.specs $(LDSCRIPTS) -Wl,--gc-sections $(MAP)
+LFLAGS=--specs=nano.specs --specs=nosys.specs -L. -L$(ROOTDIR)/$(LIBNAME) -L$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) -L$(ROOTDIR)/$(LIBNAME)/carbide -L$(ROOTDIR)/$(LIBNAME)/ld_scripts -T $(LD_SCRIPT_NAME) -Wl,--gc-sections $(MAP)
 
 
 ### RULES
@@ -99,28 +103,44 @@ LFLAGS=--specs=nano.specs --specs=nosys.specs $(LDSCRIPTS) -Wl,--gc-sections $(M
 # https://en.wikipedia.org/wiki/Intel_HEX
 all: $(NAME).hex
 	@echo ""
-	@echo "Binary size : " `$(SIZE) -d $(NAME).elf | tail -n 1 | cut -f 4` " bytes"
-	@echo "== Compiled successfully!"
+	@echo "== Finished compiling successfully!"
+
+_echo_config:
+	@echo "== Configuration summary :"
+	@echo ""
+	@echo "    CARBIDE=$(CARBIDE)"
+	@echo "    PACKAGE=$(PACKAGE)"
+	@echo "    CHIP_MODEL=$(CHIP_MODEL)"
+	@echo "    DEBUG=$(DEBUG)"
+	@echo "    BOOTLOADER=$(BOOTLOADER)"
+	@echo "    MODULES=$(MODULES)"
+	@echo "    UTILS_MODULES=$(UTILS_MODULES)"
+	@echo "    EXT_MODULES=$(EXT_MODULES)"
+	@echo "    CREATE_MAP=$(CREATE_MAP)"
+	@echo "    LD_SCRIPT_NAME=$(LD_SCRIPT_NAME)"
+	@echo ""
+	@echo "(if configuration has changed since the last compilation, remember to perform 'make clean' first)"
 
 _echo_comp_lib_objs:
 	@echo ""
 	@echo "== Compiling library modules..."
 
-_echo_comp_ext_objs:
+_echo_comp_user_objs:
 	@echo ""
-	@echo "== Compiling external modules..."
+	@echo "== Compiling user-defined modules..."
 
 # Compile user code in the standard ELF format
-$(NAME).elf: $(NAME).cpp $(STARTUP) $(STARTUP_DEP) _echo_comp_lib_objs $(LIB_OBJS) $(UTILS_OBJS) _echo_comp_ext_objs $(EXT_OBJS)
+$(NAME).elf: _echo_config $(NAME).cpp $(STARTUP) $(STARTUP_DEP) _echo_comp_lib_objs $(LIB_OBJS) $(UTILS_OBJS) _echo_comp_user_objs $(USER_OBJS)
 	@echo ""
 	@echo "== Compiling ELF..."
-	$(CXX) $(CXXFLAGS) $(LFLAGS) $(NAME).cpp $(STARTUP) $(STARTUP_DEP) $(LIB_OBJS) $(UTILS_OBJS) $(EXT_OBJS) -o $@
+	$(CXX) $(CXXFLAGS) $(LFLAGS) $(NAME).cpp $(STARTUP) $(STARTUP_DEP) $(LIB_OBJS) $(UTILS_OBJS) $(USER_OBJS) -o $@
 
 # Convert from ELF to iHEX format
 $(NAME).hex: $(NAME).elf
 	@echo ""
-	@echo "== Converting ELF to Intel HEX"
+	@echo "== Converting ELF to Intel HEX format"
 	$(OBJCOPY) -O ihex $^ $@
+	@echo "Binary size :" `$(SIZE) -d $(NAME).elf | tail -n 1 | cut -f 4` "bytes"
 
 # Compile library
 $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.o: $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.cpp $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.h $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/pins_$(CHIP_FAMILY)_$(PACKAGE).cpp $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/interrupt_priorities.cpp
@@ -187,7 +207,7 @@ upload-serial: $(NAME).hex codeuploader
 # Compile the bootloader
 bootloader:
 	make -C $(ROOTDIR)/$(LIBNAME)/bootloader
-	@echo "Bootloader size : " `$(SIZE) -d libtungsten/bootloader/bootloader.elf | tail -n 1 | cut -f 4` " bytes"
+	@echo "Bootloader size :" `$(SIZE) -d libtungsten/bootloader/bootloader.elf | tail -n 1 | cut -f 4` "bytes"
 
 # Flash the bootloader into the chip using OpenOCD
 flash-bootloader: bootloader
@@ -199,9 +219,12 @@ debug-bootloader: pause
 
 ## Cleaning rules
 
+# The 'clean' rule can be redefined in your Makefile to add your own logic, but remember :
+# 1/ to define it AFTER the 'include libtungsten/Makefile' rule
+# 2/ to add the 'clean-all' dependency
 clean: clean-all
 
 clean-all: 
-	rm -f $(NAME).elf $(NAME).map $(NAME).hex *.o $(ROOTDIR)/$(LIBNAME)/*.o $(ROOTDIR)/$(LIBNAME)/utils/*.o $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/*.o
+	rm -f $(NAME).elf $(NAME).map $(NAME).hex *.o $(ROOTDIR)/$(LIBNAME)/*.o $(ROOTDIR)/$(LIBNAME)/utils/*.o $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/*.o $(ROOTDIR)/$(LIBNAME)/carbide/*.o
 	cd $(ROOTDIR)/$(LIBNAME)/bootloader; rm -f bootloader.elf bootloader.hex *.o
 	cd $(ROOTDIR)/$(LIBNAME)/codeuploader; rm -f codeuploader *.o

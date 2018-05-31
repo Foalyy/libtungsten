@@ -10,10 +10,10 @@
 namespace Carbide {
 
     // Pins definition
-    const GPIO::Pin pinLedR = {GPIO::Port::A, 0};
-    const GPIO::Pin pinLedG = {GPIO::Port::A, 1};
-    const GPIO::Pin pinLedB = {GPIO::Port::A, 2};
-    const GPIO::Pin pinButton = {GPIO::Port::A, 4};
+    const GPIO::Pin pinLedR = GPIO::PA00;
+    const GPIO::Pin pinLedG = GPIO::PA01;
+    const GPIO::Pin pinLedB = GPIO::PA02;
+    const GPIO::Pin pinButton = GPIO::PA04;
 
     // Predefined CPU frequencies
     enum class CPUFreq {

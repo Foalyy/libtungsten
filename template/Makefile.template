@@ -1,4 +1,5 @@
-## CONFIG
+## libtungsten project compilation config
+# Remember to do 'make clean' whenever you change anything in this Makefile
 
 NAME=myproject
 
@@ -9,15 +10,18 @@ CARBIDE=true
 # Available modules : adc dac eic gloc i2c spi tc trng usart wdt.
 # Some modules such as gpio and flash are already compiled by default
 # and must not be added here.
-# If not specified, all modules will be compiled.
 MODULES=
 
 # Available utils modules : RingBuffer.
-# If not specified, all utils modules will be compiled.
 UTILS_MODULES=
 
-# External (user-provided) modules to compile with your project
-EXT_MODULES=
+# User-defined modules to compile with your project
+# Example :
+# USER_MODULES=\
+#     leds
+#     drivers/SDCard \
+#     drivers/GPS
+USER_MODULES=
 
 # Path to the toolchain. If the tools (such as arm-none-eabi-g++) are
 # not in your default $PATH, you MUST define their location here.

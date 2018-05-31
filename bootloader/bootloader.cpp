@@ -17,15 +17,15 @@
 
 
 // Configuration
-const bool MODE_INPUT = false;
-const bool MODE_TIMEOUT = true;
+const bool MODE_INPUT = true;
+const bool MODE_TIMEOUT = false;
 const bool CHANNEL_USART = false;
 const bool CHANNEL_USB = true;
-const bool _ledsEnabled = true;
-const GPIO::Pin PIN_LED_BL {GPIO::Port::A, 0}; // Green led on Carbide
-const GPIO::Pin PIN_LED_WRITE {GPIO::Port::A, 2}; // Blue led on Carbide
-const GPIO::Pin PIN_LED_ERROR {GPIO::Port::A, 1}; // Red led on Carbide
-const GPIO::Pin PIN_BUTTON {GPIO::Port::A, 4}; // For INPUT mode
+const bool LEDS_ENABLED = true;
+const GPIO::Pin PIN_LED_BL = GPIO::PA01; // Green led on Carbide
+const GPIO::Pin PIN_LED_WRITE GPIO::PA02; // Blue led on Carbide
+const GPIO::Pin PIN_LED_ERROR GPIO::PA00; // Red led on Carbide
+const GPIO::Pin PIN_BUTTON GPIO::PA04; // For INPUT mode
 const unsigned int TIMEOUT_DELAY = 3000; // ms; for TIMEOUT mode
 const USART::Port USART_PORT = USART::Port::USART1;
 
@@ -179,7 +179,7 @@ int main() {
         }
 
         // Enable LED
-        if (_ledsEnabled) {
+        if (LEDS_ENABLED) {
             GPIO::enableOutput(PIN_LED_BL, GPIO::LOW);
             GPIO::enableOutput(PIN_LED_WRITE, GPIO::HIGH);
             GPIO::enableOutput(PIN_LED_ERROR, GPIO::HIGH);
@@ -195,7 +195,7 @@ int main() {
         while (!_exitBootloader) {
             if (!_connected) {
                 // Blink rapidly
-                if (_ledsEnabled) {
+                if (LEDS_ENABLED) {
                     GPIO::set(PIN_LED_BL, GPIO::LOW);
                     Core::sleep(20);
                     GPIO::set(PIN_LED_BL, GPIO::HIGH);
@@ -218,7 +218,7 @@ int main() {
                         USART::write(USART_PORT, "ACK");
 
                         // Turn on the LED
-                        if (_ledsEnabled) {
+                        if (LEDS_ENABLED) {
                             GPIO::set(PIN_LED_BL, false);
                         }
                         Core::sleep(50);
@@ -277,7 +277,7 @@ int main() {
                         // Error
                         _status = Status::ERROR;
                         _error = BLError::CHECKSUM;
-                        if (_ledsEnabled) {
+                        if (LEDS_ENABLED) {
                             GPIO::set(PIN_LED_ERROR, false);
                         }
                         if (_activeChannel == Channel::USART) {
@@ -293,7 +293,7 @@ int main() {
                             // Error
                             _status = Status::ERROR;
                             _error = BLError::PROTECTED_AREA;
-                            if (_ledsEnabled) {
+                            if (LEDS_ENABLED) {
                                 GPIO::set(PIN_LED_ERROR, false);
                             }
                             if (_activeChannel == Channel::USART) {
@@ -305,12 +305,12 @@ int main() {
                         // Change page if necessary
                         if (currentPage != page) {
                             if (currentPage != -1) {
-                                if (_ledsEnabled) {
+                                if (LEDS_ENABLED) {
                                     GPIO::set(PIN_LED_WRITE, false);
                                 }
                                 // Write the previous page
                                 Flash::writePage(currentPage, (uint32_t*)pageBuffer);
-                                if (_ledsEnabled) {
+                                if (LEDS_ENABLED) {
                                     GPIO::set(PIN_LED_WRITE, true);
                                 }
                             }
@@ -326,11 +326,11 @@ int main() {
 
                     } else if (command == 0x01) {
                         // End of file
-                        if (_ledsEnabled) {
+                        if (LEDS_ENABLED) {
                             GPIO::set(PIN_LED_WRITE, false);
                         }
                         Flash::writePage(currentPage, (uint32_t*)pageBuffer);
-                        if (_ledsEnabled) {
+                        if (LEDS_ENABLED) {
                             GPIO::set(PIN_LED_WRITE, true);
                         }
                         Core::sleep(100);
@@ -362,6 +362,5 @@ int main() {
         uint32_t userResetHandlerAddress = (*(volatile uint32_t*)(BOOTLOADER_N_FLASH_PAGES * Flash::FLASH_PAGE_SIZE_BYTES + 0x04));
         void (*userResetHandler)() = (void (*)())(userResetHandlerAddress);
         userResetHandler();
-        //while (1);
     }
 }
