@@ -10,10 +10,10 @@
 namespace Carbide {
 
     // Pins definition
-    const GPIO::Pin pinLedR = GPIO::PA00;
-    const GPIO::Pin pinLedG = GPIO::PA01;
-    const GPIO::Pin pinLedB = GPIO::PA02;
-    const GPIO::Pin pinButton = GPIO::PA04;
+    const GPIO::Pin PIN_LED_R = GPIO::PA00;
+    const GPIO::Pin PIN_LED_G = GPIO::PA01;
+    const GPIO::Pin PIN_LED_B = GPIO::PA02;
+    const GPIO::Pin PIN_BUTTON = GPIO::PA04;
 
     // Predefined CPU frequencies
     enum class CPUFreq {
@@ -26,21 +26,22 @@ namespace Carbide {
     };
 
     // Helper functions
-    void init();
+    void init(bool autoBootloaderReset=false);
     void setCPUFrequency(CPUFreq frequency);
     void warningHandler(Error::Module module, int userModule, Error::Code code);
     void criticalHandler(Error::Module module, int userModule, Error::Code code);
-    inline void initLedR() { GPIO::enableOutput(pinLedR, GPIO::HIGH); }
-    inline void setLedR(bool on=true) { GPIO::set(pinLedR, !on); } // Inverted : pin must be LOW to turn the LED on
-    inline void initLedG() { GPIO::enableOutput(pinLedG, GPIO::HIGH); }
-    inline void setLedG(bool on=true) { GPIO::set(pinLedG, !on); }
-    inline void initLedB() { GPIO::enableOutput(pinLedB, GPIO::HIGH); }
-    inline void setLedB(bool on=true) { GPIO::set(pinLedB, !on); }
+    inline void initLedR() { GPIO::enableOutput(PIN_LED_R, GPIO::HIGH); }
+    inline void setLedR(bool on=true) { GPIO::set(PIN_LED_R, !on); } // Inverted : pin must be LOW to turn the LED on
+    inline void initLedG() { GPIO::enableOutput(PIN_LED_G, GPIO::HIGH); }
+    inline void setLedG(bool on=true) { GPIO::set(PIN_LED_G, !on); }
+    inline void initLedB() { GPIO::enableOutput(PIN_LED_B, GPIO::HIGH); }
+    inline void setLedB(bool on=true) { GPIO::set(PIN_LED_B, !on); }
     inline void initLeds() { initLedR(); initLedG(); initLedB(); }
-    inline void initButton() { GPIO::enableInput(pinButton, GPIO::Pulling::PULLUP); }
-    inline bool isButtonPressed() { return !GPIO::get(pinButton); } // Inverted : the pin is LOW when the button is pressed (pullup)
-    inline bool buttonRisingEdge() { return GPIO::fallingEdge(pinButton); } // Rising/falling are also inverted for the same reasons
-    inline bool buttonFallingEdge() { return GPIO::risingEdge(pinButton); }
+    inline void initButton() { GPIO::enableInput(PIN_BUTTON, GPIO::Pulling::PULLUP); }
+    inline bool isButtonPressed() { return !GPIO::get(PIN_BUTTON); } // Inverted : the pin is LOW when the button is pressed (pullup)
+    void onButtonPressed(void (*handler)(), bool released=false);
+    inline bool buttonRisingEdge() { return GPIO::fallingEdge(PIN_BUTTON); } // Rising/falling are also inverted for the same reasons
+    inline bool buttonFallingEdge() { return GPIO::risingEdge(PIN_BUTTON); }
 
 }
 

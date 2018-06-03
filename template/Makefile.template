@@ -7,7 +7,7 @@ NAME=myproject
 DEBUG=true
 CARBIDE=true
 
-# Available modules : adc dac eic gloc i2c spi tc trng usart wdt.
+# Available modules : adc dac eic gloc i2c spi tc trng usart.
 # Some modules such as gpio and flash are already compiled by default
 # and must not be added here.
 MODULES=

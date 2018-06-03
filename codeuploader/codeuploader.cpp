@@ -10,9 +10,13 @@
 using namespace std;
 using namespace boost;
 
-const bool DEBUG = true;
+const uint16_t VENDOR_ID = 0x1209;
+const uint16_t PRODUCT_ID = 0xCA4B;
 
-enum Request {
+const bool DEBUG = false;
+
+// USB request codes (Host -> Device)
+enum class Request {
     START_BOOTLOADER,
     CONNECT,
     STATUS,
@@ -20,15 +24,35 @@ enum Request {
     GET_ERROR,
 };
 
+// USB status codes (Device -> Host)
 enum class Status {
     READY,
     BUSY,
     ERROR,
 };
 
-unsigned int parseHex(const string& str, int pos=0, int n=2);
-void waitReady();
+// USB error codes (Device -> Host)
+enum class BLError {
+    NONE,
+    CHECKSUM_MISMATCH,
+    PROTECTED_AREA,
+    UNKNOWN_RECORD_TYPE,
+    OVERFLOW,
+};
+string ERROR_STRINGS[] = {
+    "NONE",
+    "CHECKSUM_MISMATCH",
+    "PROTECTED_AREA",
+    "UNKNOWN_RECORD_TYPE",
+    "OVERFLOW",
+};
+
+//unsigned int parseHex(const string& str, int pos=0, int n=2);
+bool waitReady();
 void debug(const char* str);
+uint8_t ask(Request request, uint16_t value=0, uint16_t index=0);
+int sendRequest(Request request, uint16_t value=0, uint16_t index=0, Direction direction=Direction::OUTPUT, uint8_t* buffer=nullptr, uint16_t length=0);
+
 
 // Open an ihex file and send it to the bootloader
 int main(int argc, char** argv) {
@@ -44,52 +68,54 @@ int main(int argc, char** argv) {
     if (argc >= 3) {
         serialPortName = argv[2];
     }
+    cout << endl;
 
     // Try to access bootloader
+    int r = 0;
     bool useSerial = false;
     asio::io_service io;
     asio::serial_port serial(io);
-    if (serialPortName.empty()) {
-        // USB
-        debug("Opening USB port 0x1209:0x0001");
-        int r = initUSB(0x1209, 0x0001);
+    if (serialPortName.empty()) { // USB
+        // Init usb library
+        r = usbInit();
+        if (r < 0) {
+            return r;
+        }
+
+        // Try to find and open a device
+        r = usbOpenDevice(VENDOR_ID, PRODUCT_ID);
         if (r == LIBUSB_ERROR_NO_DEVICE) {
-            cout << endl << "Device not found. Are you sure the cable is plugged and the bootloader started?" << endl;
+            cout << "Device not found. Are you sure the cable is plugged and the bootloader is started?" << endl;
         }
         if (r < 0) {
-            return 0;
+            usbExit();
+            return r;
         }
+
+        // Send a START_BOOTLOADER request and close the connection
         debug("Sending START_BOOTLOADER request");
-        sendRequest(START_BOOTLOADER);
-        debug("Closing USB");
-        closeUSB();
-        this_thread::sleep_for(chrono::milliseconds(10));
-        int timeout = 500;
-        debug("Trying to open USB port 0x1209:0x0001");
-        for (int i = 0; i < timeout; i++) {
-            int r = initUSB(0x1209, 0x0001);
-            if (r == 0) {
-                // Connected!
-                debug("Port opened");
-                break;
-            } else if (r != LIBUSB_ERROR_NO_DEVICE) {
-                // Error
-                cout << "Error " << r << endl;
-                return -1;
-            }
-            this_thread::sleep_for(chrono::milliseconds(10));
-            if (i == timeout - 1) {
-                cout << "timeout" << endl;
-                return -1;
-            }
+        sendRequest(Request::START_BOOTLOADER);
+        usbCloseDevice();
+        debug("Closing device connection");
+
+        // Give the board some time to reboot into bootloader mode
+        this_thread::sleep_for(chrono::milliseconds(2000));
+
+        // Try to find and open the board again
+        r = usbOpenDevice(VENDOR_ID, PRODUCT_ID);
+        if (r < 0) {
+            cout << "Unable to open device : error " << r << endl;
+            usbExit();
+            return r;
         }
+
+        // Send a CONNECT request and wait for the bootloader to be ready
         debug("Sending CONNECT request");
-        sendRequest(CONNECT);
+        sendRequest(Request::CONNECT);
         waitReady();
         cout << "Connected to bootloader" << endl;
 
-    } else {
-        // Serial
+    } else { // Serial
         useSerial = true;
         cout << "Opening " << serialPortName << "..." << endl;
         serial.open(serialPortName);
@@ -110,10 +136,11 @@ int main(int argc, char** argv) {
         cout << "connected" << endl;
     }
 
-    // Open and read file
+    // Open and read the HEX file
     ifstream file(filename);
     if (!file.is_open()) {
         cerr << "Error : no such file" << endl;
+        usbExit();
         return -4;
     }
     string line = "";
@@ -132,6 +159,7 @@ int main(int argc, char** argv) {
     for (unsigned int i = 0; i < s; i++) {
         line = lines.at(i);
 
+        // Compute percentage
         int p = 100 * (i + 1) / s;
         if (p > lastp) {
             if (i > 0) {
@@ -141,7 +169,6 @@ int main(int argc, char** argv) {
                 cout << "0";
             }
             cout << p << "%" << flush;
-            //cout << "Line " << i + 1 << " : " << line << endl;
         }
 
         // Remove newline at the end
@@ -150,7 +177,10 @@ int main(int argc, char** argv) {
         }
 
         // Check start code
-        if (line[0] != ':') {
+        if (line.length() == 0) {
+            continue;
+        } else if (line[0] != ':') {
+            cout << "Warning : ignoring line " << i + 1 << " not starting with ':'" << endl;
             continue;
         }
 
@@ -161,11 +191,15 @@ int main(int argc, char** argv) {
 
         } else {
             debug("Sending WRITE request");
-            printf("%s\n", line);
-            sendRequest(WRITE, 0, frameNumber, Direction::OUTPUT, (uint8_t*)line.data(), line.size());
+            //cout << line << endl;
+            sendRequest(Request::WRITE, 0, frameNumber, Direction::OUTPUT, (uint8_t*)line.data(), line.size());
             frameNumber++;
             if (i < s - 1) { // If not last frame
-                waitReady();
+                bool ready = waitReady();
+                if (!ready) {
+                    error = true;
+                    break;
+                }
             }
         }
 
@@ -189,30 +223,46 @@ int main(int argc, char** argv) {
 
     if (!error) {
         cout << endl;
-        cout << "============================================" << endl;
-        cout << "== Firmware uploaded successfully, enjoy! ==" << endl;
-        cout << "============================================" << endl;
+        cout << "Firmware uploaded successfully!" << endl;
     }
     
-    // Close the serial port
+    // Close the ports
     serial.close();
+    usbExit();
 }
 
-void waitReady() {
+uint8_t ask(Request request, uint16_t value, uint16_t index) {
+    return ask(static_cast<uint8_t>(request), value, index);
+}
+
+Status askStatus() {
+    Status status = static_cast<Status>(ask(Request::STATUS));
+    if (status == Status::ERROR) {
+        BLError error = static_cast<BLError>(ask(Request::GET_ERROR));
+        cout << "Error " << ERROR_STRINGS[static_cast<int>(error)] << endl;
+        if (error == BLError::PROTECTED_AREA) {
+            cout << "This HEX file contains data required to be placed in the protected area at the beginning of the internal Flash where"
+            " the bootloader lives. Make sure you have compiled with BOOTLOADER=true." << endl;
+        }
+    }
+    return status;
+}
+
+bool waitReady() {
     debug("Waiting for READY status");
     Status status;
     while (true) {
-        status = static_cast<Status>(ask(STATUS));
+        status = askStatus();
         if (status == Status::READY) {
             debug("READY");
-            break;
+            return true;
         } else if (status == Status::ERROR) {
-            cerr << "Error " << static_cast<int>(status) << endl;
-            break;
+            return false;
         } else {
-            this_thread::sleep_for(chrono::milliseconds(3));
+            this_thread::sleep_for(chrono::milliseconds(1));
         }
     };
+    return false;
 }
 
 void debug(const char* str) {
@@ -220,4 +270,8 @@ void debug(const char* str) {
         printf(str);
         printf("\n");
     }
+}
+
+int sendRequest(Request request, uint16_t value, uint16_t index, Direction direction, uint8_t* buffer, uint16_t length) {
+    return sendRequest(static_cast<uint8_t>(request), value, index, direction, buffer, length);
 }

@@ -3,7 +3,9 @@
 #include "pm.h"
 #include "bpm.h"
 #include "gpio.h"
+#include "flash.h"
 #include "ast.h"
+#include "wdt.h"
 #include "error.h"
 #include <string.h>
 
@@ -71,6 +73,18 @@ namespace Core {
             = (aircr & 0xFFFF)          // Keep the previous register value without the key
             | 1 << AIRCR_SYSRESETREQ    // SYSRESETREQ : request reset
             | AIRCR_VECTKEY;            // Write protection key
+    }
+
+    // Reset the chip in bootloader mode
+    void resetToBootloader() {
+        Flash::writeFuse(Flash::FUSE_BOOTLOADER_FORCE, true);
+        reset();
+    }
+
+    // Reset the chip in bootloader mode after a delay using the watchdog timer
+    void resetToBootloader(unsigned int delayMs) {
+        Flash::writeFuse(Flash::FUSE_BOOTLOADER_FORCE, true);
+        WDT::enable(delayMs, WDT::Unit::MILLISECONDS);
     }
 
     // Set the handler for the specified exception

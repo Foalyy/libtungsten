@@ -9,8 +9,11 @@ enum class Direction {
     INPUT = 1,
 };
 
-int initUSB(uint16_t vid, uint16_t pid, uint8_t interface=0);
-void closeUSB();
+int usbInit();
+int usbOpenDevice(uint16_t vid, uint16_t pid, uint8_t interface=0);
+int findBoard(uint16_t vid, uint16_t pid);
+void usbCloseDevice();
+void usbExit();
 int sendRequest(uint8_t request, uint16_t value=0, uint16_t index=0, Direction direction=Direction::OUTPUT, uint8_t* buffer=nullptr, uint16_t length=0);
 uint8_t ask(uint8_t request, uint16_t value=0, uint16_t index=0);
 

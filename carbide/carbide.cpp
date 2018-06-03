@@ -19,12 +19,13 @@ namespace Carbide {
     };
 
     // Handler called when a CONTROL packet is sent over USB
-    void usbControlHandler(USB::SetupPacket &lastSetupPacket, uint8_t* data, int &size) {
+    int usbControlHandler(USB::SetupPacket &lastSetupPacket, uint8_t* data, int size) {
         Request request = static_cast<Request>(lastSetupPacket.bRequest);
         if (request == Request::START_BOOTLOADER) {
             lastSetupPacket.handled = true;
-            Core::reset();
+            Core::resetToBootloader(10);
         }
+        return 0;
     }
 
     void warningHandler(Error::Module module, int userModule, Error::Code code) {
@@ -49,14 +50,16 @@ namespace Carbide {
         }
     }
 
-    void init() {
+    void init(bool autoBootloaderReset) {
         // Init the microcontroller on the default 12MHz clock
         Core::init();
         setCPUFrequency(CPUFreq::FREQ_12MHZ);
 
-        // Init the USB port start the bootloader when requested
-        //USB::initDevice();
-        //USB::setControlHandler(usbControlHandler);
+        if (autoBootloaderReset) {
+            // Init the USB port start the bootloader when requested
+            USB::initDevice();
+            USB::setControlHandler(usbControlHandler);
+        }
 
         // Init the leds and button
         initLeds();
@@ -103,6 +106,12 @@ namespace Carbide {
 
         // Wait 100ms to make sure the clocks have stabilized
         Core::sleep(100);
+    }
+
+    // Enable an handler to be called by interrupt when the button the button is
+    // either pressed or realeased
+    void onButtonPressed(void (*handler)(), bool released) {
+        GPIO::enableInterrupt(PIN_BUTTON, handler, (released ? GPIO::Trigger::RISING : GPIO::Trigger::FALLING));
     }
 
 }

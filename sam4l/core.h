@@ -170,6 +170,8 @@ namespace Core {
     // General purpose functions
     void init();
     void reset();
+    void resetToBootloader();
+    void resetToBootloader(unsigned int delayMs);
 
     // Interrupts
     void setExceptionHandler(Exception exception, void (*handler)());

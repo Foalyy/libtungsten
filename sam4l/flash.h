@@ -12,7 +12,8 @@ namespace Flash {
     const uint32_t USER_PAGE_BASE = FLASH_ARRAY_BASE + 0x00800000;
     const int FLASH_PAGE_SIZE_BYTES = 512; // bytes
     const int FLASH_PAGE_SIZE_WORDS = 128; // words
-    const int FLASH_PAGES = 512; // pages
+    // N_FLASH_PAGES is a preprocessor word defined in the library Makefile which depend on CHIP_MODEL
+    const int FLASH_PAGES = N_FLASH_PAGES; // pages
 
     // Register offsets
     const uint32_t OFFSET_FCR =         0x00; // Flash Control Register
@@ -57,6 +58,16 @@ namespace Flash {
     const uint32_t FCMD_PAGEN = 8;
     const uint32_t FCMD_KEY = 0xA5 << 24;
 
+    // General-purpose fuses
+    using Fuse = uint8_t;
+    const int N_FUSES = 48;
+
+    // These fuses are used by the bootloader and are reserved if the bootloader is enabled
+    // They need to be defined here for the Core::resetToBootloader() helper function
+    const Fuse FUSE_BOOTLOADER_FW_READY = 0;
+    const Fuse FUSE_BOOTLOADER_FORCE = 1;
+    const Fuse FUSE_BOOTLOADER_SKIP_TIMEOUT = 2;
+
 
     // Module API
     bool isReady();
@@ -68,6 +79,8 @@ namespace Flash {
     void readUserPage(uint32_t data[]);
     void eraseUserPage();
     void writeUserPage(const uint32_t data[]);
+    void writeFuse(Fuse fuse, bool state);
+    bool getFuse(Fuse fuse);
     void enableHighSpeedMode();
     void disableHighSpeedMode();
 

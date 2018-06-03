@@ -241,9 +241,13 @@ namespace USB {
     const char16_t DEFAULT_IPRODUCT[] = u"Carbide";
     const char16_t DEFAULT_SERIALNUMBER[] = u"beta";
 
+    // Default descriptor ids
+    const uint16_t DEFAULT_VENDOR_ID = 0x1209;
+    const uint16_t DEFAULT_PRODUCT_ID = 0xCA4B;
+    const uint16_t DEFAULT_DEVICE_REVISION = 0x0001;
+
 
     // Endpoints
-    extern uint32_t epDescriptors[N_EP_MAX * EP_DESCRIPTOR_SIZE];
     enum class EPBanks {
         SINGLE = 0,
         DOUBLE = 1
@@ -325,36 +329,13 @@ namespace USB {
     };
 
 
-    // Debug events
-    const int DBG_EVENTS_SIZE = 50;
-    struct Event {
-        uint8_t event;
-        uint32_t data;
-        unsigned long long time;
-    };
-    enum EventType {
-        EV_INIT,
-        EV_SUSPEND,
-        EV_WAKEUP,
-        EV_RESET,
-        EV_INIT_EP,
-        EV_SETUP,
-        EV_IN,
-        EV_OUT,
-        EV_STALL,
-        EV_GET_DESCRIPTOR,
-        EV_SET_ADDRESS,
-        EV_ENABLE_ADDRESS,
-        EV_MISC,
-    };
-
     // Package-dependant, defined in pins_sam4l_XX.cpp
     extern const struct GPIO::Pin PIN_DM;
     extern const struct GPIO::Pin PIN_DP;
 
 
     // Module API
-    void initDevice();
+    void initDevice(uint16_t vendorId=DEFAULT_VENDOR_ID, uint16_t productId=DEFAULT_PRODUCT_ID, uint16_t deviceRevision=DEFAULT_DEVICE_REVISION);
     Endpoint newEndpoint(EPType type, EPDir direction, EPBanks nBanks, EPSize size, uint8_t* bank0, uint8_t* bank1=nullptr);
     void setEndpointHandler(Endpoint endpointNumber, EPHandlerType handlerType, int (*handler)(int));
     void enableINInterrupt(Endpoint endpointNumber);
@@ -363,13 +344,12 @@ namespace USB {
     void setConnectedHandler(void (*handler)());
     void setDisconnectedHandler(void (*handler)());
     void setStartOfFrameHandler(void (*handler)());
-    void setControlHandler(void (*handler)(SetupPacket &_lastSetupPacket, uint8_t* data, int &size));
+    void setControlHandler(int (*handler)(SetupPacket &_lastSetupPacket, uint8_t* data, int size));
     void interruptHandler();
     int ep0SETUPHandler(int unused);
     int ep0INHandler(int unused);
     int ep0OUTHandler(int size);
     void remoteWakeup();
-    void addDbgEvent(enum EventType event, uint32_t data=0);
 }
 
 #endif

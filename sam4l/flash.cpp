@@ -106,6 +106,45 @@ namespace Flash {
             | FCMD_KEY;                 // KEY : write protection key
     }
 
+    void writeFuse(Fuse fuse, bool state) {
+        // Wait for the flash to be ready
+        while (!isReady());
+
+        // Check the fuse number
+        if (fuse > N_FUSES) {
+            return;
+        }
+
+        // The usable fuses are actually between 16 and 63, because the first 16 bits are lock bits
+        fuse += 16;
+
+        // FCMD (Flash Command Register) : issue a Write User Page command
+        (*(volatile uint32_t*)(FLASH_BASE + OFFSET_FCMD))
+            = (state ? FCMD_CMD_WGPB : FCMD_CMD_EGPB) << FCMD_CMD  // CMD : command code to issue (WGPB = Write General Purpose Bit)
+            | fuse << FCMD_PAGEN        // PAGEN : fuse number
+            | FCMD_KEY;                 // KEY : write protection key
+    }
+
+    bool getFuse(Fuse fuse) {
+        // Wait for the flash to be ready
+        while (!isReady());
+
+        // Check the fuse number
+        if (fuse > N_FUSES) {
+            return false;
+        }
+
+        // The usable fuses are actually between 16 and 63, because the first 16 bits are lock bits
+        fuse += 16;
+        bool high = false;
+        if (fuse >= 32) {
+            high = true;
+            fuse -= 32;
+        }
+
+        return !(((*(volatile uint32_t*)(FLASH_BASE + (high ? OFFSET_FGPFRHI : OFFSET_FGPFRLO))) >> fuse) & 0x01);
+    }
+
     void enableHighSpeedMode() {
         // FCMD (Flash Command Register) : issue a High Speed Enable command
         (*(volatile uint32_t*)(FLASH_BASE + OFFSET_FCMD))

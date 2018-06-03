@@ -43,12 +43,12 @@ namespace WDT {
     const uint32_t CTRL_KEY_2 = 0xAA << 24;
 
     enum class Unit {
-        milliseconds,
-        microseconds
+        MILLISECONDS,
+        MICROSECONDS
     };
 
     // Module API
-    void enable(unsigned int timeout, Unit unit=Unit::milliseconds);
+    void enable(unsigned int timeout, Unit unit=Unit::MILLISECONDS);
 
 }
 

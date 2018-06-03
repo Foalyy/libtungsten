@@ -12,8 +12,10 @@ namespace USB {
     volatile State _state = State::SUSPEND;
 
     // Endpoints
+    // The three least significant bits of UDESC.UDESCA are always zero according to the datasheet,
+    // so _epRAMDescriptors must be aligned to an 8-bytes boundary
     struct EndpointConfig _endpoints[N_EP_MAX];
-    uint32_t _epRAMDescriptors[N_EP_MAX * EP_DESCRIPTOR_SIZE];
+    uint32_t _epRAMDescriptors[N_EP_MAX * EP_DESCRIPTOR_SIZE] __attribute__ ((aligned (0b1000)));
     volatile int _nEndpoints = 0;
 
     // Bank for EP0
@@ -26,10 +28,7 @@ namespace USB {
     SetupPacket _lastSetupPacket;
     volatile bool _setupPacketAvailable = false;
 
-    // After a SET_ADDRESS request, the new address is configured (UDCON.UADD)
-    // but not enabled (UDCON.ADDEN) immediately because the device must finish
-    // the current stage with the default address. It is therefore enabled after
-    // the Status stage, when OUT is received
+
     volatile bool _doEnableAddress = false;
 
     // Default device descriptor content
@@ -41,9 +40,9 @@ namespace USB {
         .bDeviceSubClass = 0x00,
         .bDeviceProtocol = 0x00,
         .bMaxPacketSize0 = 64,
-        .idVendor = 0x1209,
-        .idProduct = 0x0001,
-        .bcdDevice = 0x0001,
+        .idVendor = DEFAULT_VENDOR_ID,
+        .idProduct = DEFAULT_PRODUCT_ID,
+        .bcdDevice = DEFAULT_DEVICE_REVISION,
         .iManufacturer = static_cast<uint8_t>(StringDescriptors::MANUFACTURER) + 1,
         .iProduct = static_cast<uint8_t>(StringDescriptors::PRODUCT) + 1,
         .iSerialNumber = static_cast<uint8_t>(StringDescriptors::SERIALNUMBER) + 1,
@@ -110,16 +109,12 @@ namespace USB {
     void (*_connectedHandler)() = nullptr;
     void (*_disconnectedHandler)() = nullptr;
     void (*_startOfFrameHandler)() = nullptr;
-    void (*_controlHandler)(SetupPacket &_lastSetupPacket, uint8_t* data, int &size) = nullptr;
-
-    // Events trace, for debug purposes
-    struct Event _dbgEvents[DBG_EVENTS_SIZE];
-    int _dbgEventsCursor = 0;
+    int (*_controlHandler)(SetupPacket &_lastSetupPacket, uint8_t* data, int size) = nullptr;
 
 
 
     // Initialize the USB controller in Device mode
-    void initDevice() {
+    void initDevice(uint16_t vendorId, uint16_t productId, uint16_t deviceRevision) {
         // Init state
         _state = State::SUSPEND;
 
@@ -157,15 +152,10 @@ namespace USB {
             = 0 << UDCON_LS        // LS : full-speed mode
             | 0 << UDCON_DETACH;   // DETACH : attach device
 
-        // Enable interrupts
-        (*(volatile uint32_t*)(USB_BASE + OFFSET_UDINTESET))
-            = 1 << UDINT_SUSP
-            | 1 << UDINT_EORST
-            | 1 << UDINT_WAKEUP;
-        Core::setInterruptHandler(Core::Interrupt::USBC, interruptHandler);
-        Core::enableInterrupt(Core::Interrupt::USBC, INTERRUPT_PRIORITY);
-
-        addDbgEvent(EV_INIT);
+        // Configure the device descriptor
+        _deviceDescriptor.idVendor = vendorId;
+        _deviceDescriptor.idProduct = productId;
+        _deviceDescriptor.bcdDevice = deviceRevision;
 
         // Init the first endpoint (mandatory Control Endpoint)
         EndpointConfig* ep = &_endpoints[0];
@@ -179,6 +169,14 @@ namespace USB {
         setEndpointHandler(0, EPHandlerType::IN, ep0INHandler);
         setEndpointHandler(0, EPHandlerType::OUT, ep0OUTHandler);
         _nEndpoints = 1;
+
+        // Enable interrupts
+        (*(volatile uint32_t*)(USB_BASE + OFFSET_UDINTESET))
+            = 1 << UDINT_SUSP
+            | 1 << UDINT_EORST
+            | 1 << UDINT_WAKEUP;
+        Core::setInterruptHandler(Core::Interrupt::USBC, interruptHandler);
+        Core::enableInterrupt(Core::Interrupt::USBC, INTERRUPT_PRIORITY);
     }
 
 
@@ -253,22 +251,19 @@ namespace USB {
                 + _interfaceDescriptor.bLength
                 + (_nEndpoints > 1 ? (_nEndpoints - 1) * ep->descriptor.bLength : 0);
             _interfaceDescriptor.bNumEndpoints = _nEndpoints - 1;
-
-            addDbgEvent(EV_INIT_EP, n);
         }
         return n;
     }
 
     // Main interrupt handler called when an USB-related event happens
     void interruptHandler() {
+        // GPIO::set(GPIO::PA10, GPIO::HIGH);
 
         uint32_t udint = (*(volatile uint32_t*)(USB_BASE + OFFSET_UDINT));
         uint32_t udinte = (*(volatile uint32_t*)(USB_BASE + OFFSET_UDINTE));
 
         // Suspend
         if (udinte & udint & (1 << UDINT_SUSP)) {
-            addDbgEvent(EV_SUSPEND);
-
             // Update the driver state
             _state = State::SUSPEND;
 
@@ -299,8 +294,6 @@ namespace USB {
 
         // Wake up
         if (udinte & udint & (1 << UDINT_WAKEUP)) {
-            addDbgEvent(EV_WAKEUP);
-
             // Update the driver state
             _state = State::POWERED;
 
@@ -330,8 +323,6 @@ namespace USB {
 
         // End of reset
         if (udinte & udint & (1 << UDINT_EORST)) {
-            addDbgEvent(EV_RESET);
-
             // Clear interrupt
             (*(volatile uint32_t*)(USB_BASE + OFFSET_UDINTCLR))
                 = 1 << UDINT_EORST;
@@ -373,59 +364,33 @@ namespace USB {
         for (int i = 0; i < _nEndpoints; i++) {
             if (_endpoints[i].enabled && (udinte & udint & (1 << (UDINT_EP0INT + i)))) {
                 // Check which packet type has been received in UESTA
-                uint32_t uesta = (*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0 + i * 4));
-                uint32_t uecon = (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0 + i * 4));
+                volatile uint32_t* uesta = (volatile uint32_t*)(USB_BASE + OFFSET_UESTA0 + i * 4);
+                volatile uint32_t* uecon = (volatile uint32_t*)(USB_BASE + OFFSET_UECON0 + i * 4);
                 EndpointConfig* ep = &_endpoints[i];
 
                 // SETUP packet
-                if (uecon & uesta & (1 << UESTA_RXSTPI)) {
-                    addDbgEvent(EV_SETUP, i);
+                if (*uecon & *uesta & (1 << UESTA_RXSTPI)) {
+                    // GPIO::set(GPIO::PA12, GPIO::HIGH);
 
                     // Call the handler to read the packet content
                     if (ep->handlers[static_cast<int>(EPHandlerType::SETUP)] != nullptr) {
                         ep->handlers[static_cast<int>(EPHandlerType::SETUP)](0);
                     }
 
-                    // Clear interrupt
+                    // Clear interrupt to acknoledge the packet and free the bank
                     (*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR + i * 4))
                         = 1 << UESTA_RXSTPI;
+                    // GPIO::set(GPIO::PA12, GPIO::LOW);
 
-                // OUT packet
-                } else if (uecon & uesta & (1 << UESTA_RXOUTI)) {
-                    addDbgEvent(EV_OUT, i);
-
-                    // Number of bytes received
-                    int receivedPacketSize = _epRAMDescriptors[i * EP_DESCRIPTOR_SIZE + EP_PCKSIZE] & PCKSIZE_BYTE_COUNT_MASK;
-
-                    // Call the handler to read the packet content
-                    if (ep->handlers[static_cast<int>(EPHandlerType::OUT)] != nullptr) {
-                        ep->handlers[static_cast<int>(EPHandlerType::OUT)](receivedPacketSize);
-                    }
-
-                    // Clear interrupt
-                    (*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR + i * 4))
-                        = 1 << UESTA_RXOUTI;
-
-                    // If this is an OUT endpoint, clear FIFOCON to free the bank
-                    if (ep->direction == EPDir::OUT) {
-                        (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0CLR + i * 4))
-                            = 1 << UECON_FIFOCON;
-                    }
-
-                    // If this is an IN or No Data transfer, an OUT packet means the transfer is finished or aborted
-                    if (_lastSetupPacket.direction == EPDir::IN || _lastSetupPacket.wLength == 0) {
-                        // Disable IN interrupt
-                        (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0CLR + i * 4))
-                            = 1 << UECON_TXINE;
-                    }
+                }
 
                 // IN packet
                 // Note : this is not called when an IN packet is received, but whenever the bank is ready
                 // to receive the content for the next IN packet. This is because the data must be sent 
                 // immediately after the IN packet, with no time for a handler call, and must therefore be
                 // prepared beforehand.
-                } else if (uecon & uesta & (1 << UESTA_TXINI)) {
-                    addDbgEvent(EV_IN, i);
+                if (*uecon & *uesta & (1 << UESTA_TXINI)) {
+                    // GPIO::set(GPIO::PA14, GPIO::HIGH);
 
                     // Call the handler to write the packet content
                     int bytesToSend = 0;
@@ -443,21 +408,53 @@ namespace USB {
 
                     // If this is an IN endpoint, clear FIFOCON to free the bank and allow the
                     // hardware to send the data at the next IN packet
-                    if (ep->direction == EPDir::IN) {
+                    if (ep->type != EPType::CONTROL && ep->direction == EPDir::IN) {
                         (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0CLR + i * 4))
                             = 1 << UECON_FIFOCON;
                     }
+                    // GPIO::set(GPIO::PA14, GPIO::LOW);
+                }
+                
+                // OUT packet
+                if (*uecon & *uesta & (1 << UESTA_RXOUTI)) {
+                    // GPIO::set(GPIO::PA13, GPIO::HIGH);
+
+                    // Number of bytes received
+                    int receivedPacketSize = _epRAMDescriptors[i * EP_DESCRIPTOR_SIZE + EP_PCKSIZE] & PCKSIZE_BYTE_COUNT_MASK;
+
+                    // Call the handler to read the packet content
+                    if (ep->handlers[static_cast<int>(EPHandlerType::OUT)] != nullptr) {
+                        ep->handlers[static_cast<int>(EPHandlerType::OUT)](receivedPacketSize);
+                    }
+
+                    // Clear interrupt
+                    (*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR + i * 4))
+                        = 1 << UESTA_RXOUTI;
+
+                    // If this is an OUT endpoint, clear FIFOCON to free the bank
+                    if (ep->type != EPType::CONTROL && ep->direction == EPDir::OUT) {
+                        (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0CLR + i * 4))
+                            = 1 << UECON_FIFOCON;
+                    }
+
+                    // If this is an IN or No Data transfer, an OUT packet means the transfer is finished or aborted
+                    if (_lastSetupPacket.direction == EPDir::IN || _lastSetupPacket.wLength == 0) {
+                        // Disable IN interrupt
+                    }
+                    // GPIO::set(GPIO::PA13, GPIO::LOW);
                 }
             }
         }
+
+        // GPIO::set(GPIO::PA10, GPIO::LOW);
     }
 
 
     // Handlers for endpoint 0
     int ep0SETUPHandler(int unused) {
-        // Read received data in bankEP0 and respond accordingly
-        //int receivedPacketSize = _epRAMDescriptors[EP_PCKSIZE] & PCKSIZE_BYTE_COUNT_MASK;
-        uint8_t* bank = (uint8_t*)_epRAMDescriptors[0];
+        // Read data received in bankEP0
+        const int EP_N = 0; // Endpoint number : 0 in this handler
+        uint8_t* bank = (uint8_t*)_epRAMDescriptors[EP_N + EP_ADDR];
         _lastSetupPacket = {
             .bmRequestType = bank[0],
             .bRequest = bank[1],
@@ -470,34 +467,10 @@ namespace USB {
             .handled = false
         };
 
-        // Standard device request
-        if (_lastSetupPacket.requestType == SetupRequestType::STANDARD
-                && _lastSetupPacket.recipent == SetupRecipient::DEVICE) {
-
-            if (_lastSetupPacket.bRequest == USBREQ_GET_DESCRIPTOR) {
-                addDbgEvent(EV_GET_DESCRIPTOR, _lastSetupPacket.wValue);
-
-                // Do nothing now, the request is saved above, and the descriptor is already
-                // ready and will be sent when the IN packet is received
-
-            } else if (_lastSetupPacket.bRequest == USBREQ_SET_ADDRESS) {
-                addDbgEvent(EV_SET_ADDRESS, _lastSetupPacket.wValue);
-
-                // Write address (disabled)
-                uint32_t udcon = (*(volatile uint32_t*)(USB_BASE + OFFSET_UDCON));
-                (*(volatile uint32_t*)(USB_BASE + OFFSET_UDCON))
-                    = (udcon & ~(uint32_t)(0xFF << UDCON_UADD))
-                    | _lastSetupPacket.wValue << UDCON_UADD;   // UADD : USB device address
-            }
-        }
-
         // If this is an IN or No Data transfer
         if (_lastSetupPacket.direction == EPDir::IN || _lastSetupPacket.wLength == 0) {
-            // Enable the IN interrupt to ACK this request with a ZLP
-            (*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR))
-                = 1 << UESTA_TXINI;
-            (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0SET))
-                = 1 << UECON_TXINE;
+            // Enable the IN interrupt to answer this request (or ACK it with a ZLP for a No Data transfer)
+            enableINInterrupt(0);
         }
 
         // Mark that a SETUP packet has been received
@@ -507,17 +480,17 @@ namespace USB {
     }
 
     int ep0INHandler(int unused) {
-        // Behave according to the last SETUP packet received
-        if (_setupPacketAvailable) {
+        const int EP_N = 0; // Endpoint number : 0 in this handler
 
-            _lastSetupPacket.handled = false;
+        // Answer the last SETUP packet received
+        if (_setupPacketAvailable) {
 
             // Standard request
             if (_lastSetupPacket.requestType == SetupRequestType::STANDARD) {
 
                 // GET_DESCRIPTOR standard request
                 if (_lastSetupPacket.bRequest == USBREQ_GET_DESCRIPTOR) {
-                    uint8_t* bank = (uint8_t*)_epRAMDescriptors[EP_ADDR];
+                    uint8_t* bank = (uint8_t*)_epRAMDescriptors[EP_N + EP_ADDR];
 
                     // Select descriptor to send
                     const uint8_t descriptorType = _lastSetupPacket.wValue >> 8;
@@ -525,6 +498,8 @@ namespace USB {
 
                     // Default device descriptor
                     if (descriptorType == USBDESC_DEVICE && descriptorIndex == 0) {
+                        // GPIO::set(GPIO::PA11, GPIO::HIGH);
+                        // GPIO::set(GPIO::PA11, GPIO::LOW);
                         _lastSetupPacket.handled = true;
 
                         // Copy the descriptor to the bank
@@ -575,15 +550,27 @@ namespace USB {
                 // SET_ADDRESS standard request
                 } else if (_lastSetupPacket.bRequest == USBREQ_SET_ADDRESS) {
                     _lastSetupPacket.handled = true;
-                        
-                    // Enable address if required (see _doEnableAddress definition)
+
+                    // After a SET_ADDRESS request, the new address is configured (UDCON.UADD) but
+                    // not enabled (UDCON.ADDEN) immediately because the device must finish the
+                    // current transaction with the default address.
+                    // The IN interrupt is triggered for the first just after the SETUP request to
+                    // prepare the answer of the next IN transfer (request ACK). During this transfer
+                    // the address is written to UDCON but must not be enabled yet. When the ACK transfer
+                    // is sent, the bank is free once again and the IN interrupt is triggered a second
+                    // time. Since there is no Status Stage in a SET_ADDRESS request, this is a good
+                    // time to enable the address.
                     if (!_doEnableAddress) {
+                        // Write address (disabled)
+                        uint32_t udcon = (*(volatile uint32_t*)(USB_BASE + OFFSET_UDCON));
+                        (*(volatile uint32_t*)(USB_BASE + OFFSET_UDCON))
+                            = (udcon & ~(uint32_t)(0xFF << UDCON_UADD))
+                            | _lastSetupPacket.wValue << UDCON_UADD;   // UADD : USB device address
+
+                        // Enable the flag
                         _doEnableAddress = true;
 
                     } else {
-                        addDbgEvent(EV_ENABLE_ADDRESS);
-                        _doEnableAddress = false;
-
                         // Enable address
                         (*(volatile uint32_t*)(USB_BASE + OFFSET_UDCON))
                             |= 1 << UDCON_ADDEN;   // ADDEN : enable address
@@ -595,6 +582,9 @@ namespace USB {
                         
                         // Move through the next enumeration step
                         _state = State::ADDRESS;
+
+                        // Disable the flag
+                        _doEnableAddress = false;
                     }
 
                     // Answer with a ZLP
@@ -610,7 +600,7 @@ namespace USB {
                         if (configurationId == 0) {
                             _lastSetupPacket.handled = true;
                             
-                            // The device is no longer configurer, reset to Address state
+                            // The device is no longer configured, reset to Address state
                             _state = State::ADDRESS;
                         
                             // Answer with a ZLP
@@ -630,53 +620,51 @@ namespace USB {
                 }
 
             } else if (_lastSetupPacket.requestType == SetupRequestType::VENDOR) {
-                // Call user handler
+                // Call user handler if this is a IN or No Data request. For an OUT request with data,
+                // the user handler will be called by ep0OUTHandler() when the data has been received
                 if (_controlHandler != nullptr) {
-                    // Select the size to send to the handler
-                    int size = 0;
-                    if (_lastSetupPacket.direction == EPDir::OUT && _lastSetupPacket.wLength > 0) {
-                        // OUT data packet : send the number of bytes received
-                        size = _epRAMDescriptors[EP_PCKSIZE] & PCKSIZE_BYTE_COUNT_MASK;
-                        _controlHandler(_lastSetupPacket, _bankEP0, size);
-                    } else if (_lastSetupPacket.direction == EPDir::OUT && _lastSetupPacket.wLength == 0) {
-                        // No Data packet : send 0
-                        size = 0;
-                        _controlHandler(_lastSetupPacket, nullptr, size);
-                    } else {
-                        // IN packet : send the number of bytes requested
-                        size = _lastSetupPacket.wLength;
-                        _controlHandler(_lastSetupPacket, _bankEP0, size);
-                        return size;
+                    if (_lastSetupPacket.direction == EPDir::IN || _lastSetupPacket.wLength == 0) {
+                        int bytesToSend = _controlHandler(_lastSetupPacket, _bankEP0, _lastSetupPacket.wLength);
+                        return min(_lastSetupPacket.wLength, bytesToSend);
                     }
+                    // For an OUT request, _lastSetupPacket.handled was set previously by ep0OUTHandler()
                 }
             }
 
             // If the request couldn't be handled, send a STALL
             if (!_lastSetupPacket.handled) {
-                addDbgEvent(EV_STALL, _lastSetupPacket.bRequest);
-
+                // GPIO::set(GPIO::PA15, GPIO::HIGH);
+                // GPIO::set(GPIO::PA15, GPIO::LOW);
                 (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0SET))
                     = 1 << UECON_STALLRQ;
                 return 0;
             }
+
+        } else {
+            // No SETUP packet available
+            disableINInterrupt(0);
         }
 
         return 0;
     }
 
     int ep0OUTHandler(int size) {
+        const int EP_N = 0; // Endpoint number : 0 in this handler
+
         if (_lastSetupPacket.direction == EPDir::IN) {
             // This is an ACK from the host
             _setupPacketAvailable = false;
+            disableINInterrupt(0);
 
         } else {
-            // This is an OUT packet containing data, unused for EP0
+            // This is an OUT packet containing data
+            if (_controlHandler != nullptr) {
+                int size = _epRAMDescriptors[EP_N + EP_PCKSIZE] & PCKSIZE_BYTE_COUNT_MASK;
+                _controlHandler(_lastSetupPacket, _bankEP0, size);
+            }
 
-            // Enable the IN interrupt to ACK this
-            (*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR))
-                = 1 << UESTA_TXINI;
-            (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0SET))
-                = 1 << UECON_TXINE;
+            // Enable the IN interrupt to ACK the received data
+            enableINInterrupt(0);
         }
         return 0;
     }
@@ -730,7 +718,7 @@ namespace USB {
         _startOfFrameHandler = handler;
     }
 
-    void setControlHandler(void (*handler)(SetupPacket &_lastSetupPacket, uint8_t* data, int &size)) {
+    void setControlHandler(int (*handler)(SetupPacket &_lastSetupPacket, uint8_t* data, int size)) {
         _controlHandler = handler;
     }
 
@@ -741,17 +729,6 @@ namespace USB {
         if (_state == State::SUSPEND) {
             (*(volatile uint32_t*)(USB_BASE + OFFSET_UDCON))
                 |= 1 << UDCON_RMWKUP;
-        }
-    }
-
-    void addDbgEvent(enum EventType event, uint32_t data) {
-        if (_dbgEventsCursor < DBG_EVENTS_SIZE) {
-            _dbgEvents[_dbgEventsCursor] = {
-                .event = event,
-                .data = data,
-                .time = Core::time()
-            };
-            _dbgEventsCursor++;
         }
     }
 }

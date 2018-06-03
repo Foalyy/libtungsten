@@ -2,11 +2,12 @@
 # Remember to do 'make clean' whenever you change anything in this Makefile
 
 NAME=bootloader
+DEBUG=true
 
 # Available modules : adc dac eic gloc i2c spi tc trng usart wdt.
 # Some modules such as gpio and flash are already compiled by default
 # and must not be added here.
-MODULES=tc usart wdt
+MODULES=usart
 
 # Path to the toolchain. If the tools (such as arm-none-eabi-g++) are
 # not in your default $PATH, you MUST define their location here.

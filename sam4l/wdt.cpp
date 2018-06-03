@@ -8,7 +8,7 @@ namespace WDT {
         uint8_t psel = 0;
         if (timeout > 0) {
             unsigned int basePeriod = 10000000L / SCIF::getRCSYSFrequency(); // Base period in 10th of microseconds
-            if (unit == Unit::milliseconds) {
+            if (unit == Unit::MILLISECONDS) {
                 timeout *= 1000; // microseconds
             }
             timeout *= 10;  // 10th of microseconds

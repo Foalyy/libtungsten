@@ -10,7 +10,7 @@ ifndef CHIP_FAMILY
 endif
 ifndef CHIP_MODEL
 	# ls2x, ls4x or ls8x, indicates the quantity of memory (see datasheet 2.2 Configuration Summary)
-	CHIP_MODEL=ls8x
+	CHIP_MODEL=ls4x
 endif
 ifndef PACKAGE
 	PACKAGE=64
@@ -36,7 +36,7 @@ endif
 
 # Library
 LIBNAME=libtungsten
-CORE_MODULES=pins_$(CHIP_FAMILY)_$(PACKAGE) interrupt_priorities core dma flash scif bscif pm bpm ast gpio usb error
+CORE_MODULES=pins_$(CHIP_FAMILY)_$(PACKAGE) ast bpm bscif core dma error flash gpio interrupt_priorities pm scif usb wdt
 LIB_MODULES=$(CORE_MODULES) $(MODULES)
 
 # Compilation objects
@@ -64,7 +64,16 @@ ARCH_FLAGS=-mthumb -mcpu=cortex-m$(CORTEX_M)
 STARTUP=$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/startup.cpp
 
 # Defines passed to the preprocessor using -D
-PREPROC_DEFINES=-DPACKAGE=$(PACKAGE) -DBOOTLOADER=$(BOOTLOADER) -DDEBUG=$(DEBUG)
+ifeq ($(strip $(CHIP_MODEL)),ls2x)
+	N_FLASH_PAGES=256
+else ifeq ($(strip $(CHIP_MODEL)),ls4x)
+	N_FLASH_PAGES=512
+else ifeq ($(strip $(CHIP_MODEL)),ls8x)
+	N_FLASH_PAGES=1024
+else
+$(error Unknown CHIP_MODEL $(CHIP_MODEL), please use ls2x, ls4x or ls8x)
+endif
+PREPROC_DEFINES=-DPACKAGE=$(PACKAGE) -DBOOTLOADER=$(BOOTLOADER) -DDEBUG=$(DEBUG) -DN_FLASH_PAGES=$(N_FLASH_PAGES)
 
 # Compilation flags
 # Note : do not use -O0, as this might generate code too slow for some peripherals (notably the SPI controller)
@@ -95,7 +104,7 @@ LFLAGS=--specs=nano.specs --specs=nosys.specs -L. -L$(ROOTDIR)/$(LIBNAME) -L$(RO
 
 ### RULES
 
-.PHONY: flash pause reset debug flash-debug codeuploader upload bootloader flash-bootloader debug-bootloader openocd clean clean-all _echo_comp_lib_objs _echo_comp_ext_objs
+.PHONY: flash pause reset debug flash-debug codeuploader upload bootloader flash-bootloader debug-bootloader openocd clean clean-all _echo_config _echo_comp_lib_objs _echo_comp_user_objs
 
 ## Usercode-related rules
 
