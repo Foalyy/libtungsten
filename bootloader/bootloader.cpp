@@ -14,13 +14,6 @@
 // as another microcontroller or a button) and/or a timeout. Most of the behaviour can be customized
 // to your liking.
 
-const GPIO::Pin PIN_DBG_1 = GPIO::PA10;
-const GPIO::Pin PIN_DBG_2 = GPIO::PA11;
-const GPIO::Pin PIN_DBG_3 = GPIO::PA12;
-const GPIO::Pin PIN_DBG_4 = GPIO::PA13;
-const GPIO::Pin PIN_DBG_5 = GPIO::PA14;
-const GPIO::Pin PIN_DBG_6 = GPIO::PA15;
-
 // Configuration
 const bool MODE_INPUT = true;
 const bool MODE_TIMEOUT = false;
@@ -75,7 +68,13 @@ enum class Mode {
     TIMEOUT,
 };
 
+// Number of flash pages reserved to the bootloader. If this value is modified, please update
+// the FLASH/LENGTH parameter in ld_scripts/bootloader.ld and the FLASH/ORIGIN parameter in the
+// three ld_scripts/usercode_bootloader_lsxx.ld files accordingly.
+// For BOOTLOADER_N_FLASH_PAGES = 32, the total bootloader size is 32 * 512 (size of a flash page
+// in bytes) = 16384 = 0x4000.
 const int BOOTLOADER_N_FLASH_PAGES = 32;
+
 const int BUFFER_SIZE = 128;
 char _buffer[BUFFER_SIZE];
 volatile int _currentPage = -1;
@@ -210,11 +209,13 @@ int main() {
     }
 
     // Force entering bootloader in these cases :
-    // - the reset handler pointer doesn't look right (the memory is empty, after the flashing of a new bootloader?)
+    // - the reset handler pointer or the stack pointer don't look right (the memory is empty, after the flashing of a new bootloader?)
     // - there is no available firmware according to the FW_READY fuse (a previous upload failed ?)
     // - the BOOTLOADER_FORCE fuse is set (after a call to Core::resetToBootloader() ?)
+    uint32_t userStackPointerAddress = (*(volatile uint32_t*)(BOOTLOADER_N_FLASH_PAGES * Flash::FLASH_PAGE_SIZE_BYTES));
     uint32_t userResetHandlerAddress = (*(volatile uint32_t*)(BOOTLOADER_N_FLASH_PAGES * Flash::FLASH_PAGE_SIZE_BYTES + 0x04));
-    if (userResetHandlerAddress == 0x00000000 || userResetHandlerAddress == 0xFFFFFFFF
+    if (userStackPointerAddress == 0x00000000 || userStackPointerAddress == 0xFFFFFFFF
+            || userResetHandlerAddress == 0x00000000 || userResetHandlerAddress == 0xFFFFFFFF
             || !Flash::getFuse(Flash::FUSE_BOOTLOADER_FW_READY)
             || Flash::getFuse(Flash::FUSE_BOOTLOADER_FORCE)) {
         enterBootloader = true;
@@ -224,12 +225,6 @@ int main() {
     if (enterBootloader) {
         // Init the basic core systems
         Core::init();
-        GPIO::enableOutput(PIN_DBG_1, GPIO::LOW);
-        GPIO::enableOutput(PIN_DBG_2, GPIO::LOW);
-        GPIO::enableOutput(PIN_DBG_3, GPIO::LOW);
-        GPIO::enableOutput(PIN_DBG_4, GPIO::LOW);
-        GPIO::enableOutput(PIN_DBG_5, GPIO::LOW);
-        GPIO::enableOutput(PIN_DBG_6, GPIO::LOW);
 
         // Set main clock to the 12MHz RC oscillator
         SCIF::enableRCFAST(SCIF::RCFASTFrequency::RCFAST_12MHZ);
@@ -464,7 +459,13 @@ int main() {
         while (1);
 
     } else {
-        // Execute the user code
+        // Load the stack pointer register at offset 0 of the user's vector table
+        // See ARMv7-M Architecture Reference Manual, section B1.5.3 The vector Table
+        volatile uint32_t* sp = (volatile uint32_t*)(BOOTLOADER_N_FLASH_PAGES * Flash::FLASH_PAGE_SIZE_BYTES);
+        __asm__("LDR sp, %0" : : "m" (*sp));
+
+        // Execute the user code by jumping to offset 4 of the user's vector table (ResetHandler)
+        // See ARMv7-M Architecture Reference Manual, section B1.5.2 Exception number definition
         void (*userResetHandler)() = (void (*)())(userResetHandlerAddress);
         userResetHandler();
     }

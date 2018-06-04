@@ -226,6 +226,8 @@ flash-bootloader: bootloader
 debug-bootloader: pause
 	$(GDB) -ex "set print pretty on" -ex "target extended-remote localhost:3333" $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.elf
 
+flash-debug-bootloader: flash-bootloader debug-bootloader
+
 ## Cleaning rules
 
 # The 'clean' rule can be redefined in your Makefile to add your own logic, but remember :

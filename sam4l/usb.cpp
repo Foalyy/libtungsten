@@ -257,8 +257,6 @@ namespace USB {
 
     // Main interrupt handler called when an USB-related event happens
     void interruptHandler() {
-        // GPIO::set(GPIO::PA10, GPIO::HIGH);
-
         uint32_t udint = (*(volatile uint32_t*)(USB_BASE + OFFSET_UDINT));
         uint32_t udinte = (*(volatile uint32_t*)(USB_BASE + OFFSET_UDINTE));
 
@@ -370,8 +368,6 @@ namespace USB {
 
                 // SETUP packet
                 if (*uecon & *uesta & (1 << UESTA_RXSTPI)) {
-                    // GPIO::set(GPIO::PA12, GPIO::HIGH);
-
                     // Call the handler to read the packet content
                     if (ep->handlers[static_cast<int>(EPHandlerType::SETUP)] != nullptr) {
                         ep->handlers[static_cast<int>(EPHandlerType::SETUP)](0);
@@ -380,7 +376,6 @@ namespace USB {
                     // Clear interrupt to acknoledge the packet and free the bank
                     (*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR + i * 4))
                         = 1 << UESTA_RXSTPI;
-                    // GPIO::set(GPIO::PA12, GPIO::LOW);
 
                 }
 
@@ -390,8 +385,6 @@ namespace USB {
                 // immediately after the IN packet, with no time for a handler call, and must therefore be
                 // prepared beforehand.
                 if (*uecon & *uesta & (1 << UESTA_TXINI)) {
-                    // GPIO::set(GPIO::PA14, GPIO::HIGH);
-
                     // Call the handler to write the packet content
                     int bytesToSend = 0;
                     if (ep->handlers[static_cast<int>(EPHandlerType::IN)] != nullptr) {
@@ -412,13 +405,10 @@ namespace USB {
                         (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0CLR + i * 4))
                             = 1 << UECON_FIFOCON;
                     }
-                    // GPIO::set(GPIO::PA14, GPIO::LOW);
                 }
                 
                 // OUT packet
                 if (*uecon & *uesta & (1 << UESTA_RXOUTI)) {
-                    // GPIO::set(GPIO::PA13, GPIO::HIGH);
-
                     // Number of bytes received
                     int receivedPacketSize = _epRAMDescriptors[i * EP_DESCRIPTOR_SIZE + EP_PCKSIZE] & PCKSIZE_BYTE_COUNT_MASK;
 
@@ -441,12 +431,9 @@ namespace USB {
                     if (_lastSetupPacket.direction == EPDir::IN || _lastSetupPacket.wLength == 0) {
                         // Disable IN interrupt
                     }
-                    // GPIO::set(GPIO::PA13, GPIO::LOW);
                 }
             }
         }
-
-        // GPIO::set(GPIO::PA10, GPIO::LOW);
     }
 
 
@@ -498,8 +485,6 @@ namespace USB {
 
                     // Default device descriptor
                     if (descriptorType == USBDESC_DEVICE && descriptorIndex == 0) {
-                        // GPIO::set(GPIO::PA11, GPIO::HIGH);
-                        // GPIO::set(GPIO::PA11, GPIO::LOW);
                         _lastSetupPacket.handled = true;
 
                         // Copy the descriptor to the bank
@@ -633,8 +618,6 @@ namespace USB {
 
             // If the request couldn't be handled, send a STALL
             if (!_lastSetupPacket.handled) {
-                // GPIO::set(GPIO::PA15, GPIO::HIGH);
-                // GPIO::set(GPIO::PA15, GPIO::LOW);
                 (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0SET))
                     = 1 << UECON_STALLRQ;
                 return 0;

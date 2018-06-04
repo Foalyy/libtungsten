@@ -2,7 +2,7 @@
 # Remember to do 'make clean' whenever you change anything in this Makefile
 
 NAME=bootloader
-DEBUG=true
+#DEBUG=true
 
 # Available modules : adc dac eic gloc i2c spi tc trng usart wdt.
 # Some modules such as gpio and flash are already compiled by default
