@@ -55,6 +55,7 @@ CXX=$(TOOLCHAIN_PATH)arm-none-eabi-g++
 OBJCOPY=$(TOOLCHAIN_PATH)arm-none-eabi-objcopy
 GDB=$(TOOLCHAIN_PATH)arm-none-eabi-gdb
 SIZE=$(TOOLCHAIN_PATH)arm-none-eabi-size
+OBJDUMP=$(TOOLCHAIN_PATH)arm-none-eabi-objdump
 OPENOCD=openocd
 
 # Architecture options
@@ -105,7 +106,7 @@ LFLAGS=--specs=nano.specs --specs=nosys.specs -L. -L$(ROOTDIR)/$(LIBNAME) -L$(RO
 
 ### RULES
 
-.PHONY: flash pause reset debug flash-debug codeuploader upload bootloader flash-bootloader debug-bootloader openocd clean clean-all _echo_config _echo_comp_lib_objs _echo_comp_user_objs
+.PHONY: flash pause reset debug flash-debug objdump codeuploader upload bootloader flash-bootloader debug-bootloader objdump-bootloader openocd clean clean-all _echo_config _echo_comp_lib_objs _echo_comp_user_objs
 
 
 ## Usercode-related rules
@@ -197,6 +198,10 @@ debug: pause
 # Flash and debug the firmware
 flash-debug: flash debug
 
+# Show the disassembly of the compiled program
+objdump: $(NAME).hex
+	$(OBJDUMP) -d $(NAME).elf | less
+
 
 ## Codeuploader-related rules
 
@@ -219,7 +224,7 @@ upload-serial: $(NAME).hex codeuploader
 ## Bootloader-related rules
 
 # Compile the bootloader
-bootloader:
+bootloader: $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader_config.h
 	make -C $(ROOTDIR)/$(LIBNAME)/bootloader
 	@echo "Bootloader size :" `$(SIZE) -d libtungsten/bootloader/bootloader.elf | tail -n 1 | cut -f 4` "bytes"
 
@@ -237,6 +242,11 @@ debug-bootloader: pause
 
 # Flash and debug the bootloader
 flash-debug-bootloader: flash-bootloader debug-bootloader
+
+# Show the disassembly of the compiled bootloader
+objdump-bootloader: bootloader
+	$(OBJDUMP) -d $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.elf | less
+
 
 ## Cleaning rules
 

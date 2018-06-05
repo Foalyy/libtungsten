@@ -67,6 +67,7 @@ namespace Flash {
     const Fuse FUSE_BOOTLOADER_FW_READY = 0;
     const Fuse FUSE_BOOTLOADER_FORCE = 1;
     const Fuse FUSE_BOOTLOADER_SKIP_TIMEOUT = 2;
+    const int BOOTLOADER_N_RESERVED_FUSES = 3;
 
 
     // Module API

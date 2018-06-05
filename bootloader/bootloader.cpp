@@ -404,6 +404,9 @@ int main() {
         while (1);
 
     } else {
+        // Update VTOR to point to the vector table of the user program
+        (*(volatile uint32_t*) Core::VTOR) = BOOTLOADER_N_FLASH_PAGES * Flash::FLASH_PAGE_SIZE_BYTES;
+
         // Load the stack pointer register at offset 0 of the user's vector table
         // See ARMv7-M Architecture Reference Manual, section B1.5.3 The vector Table
         volatile uint32_t* sp = (volatile uint32_t*)(BOOTLOADER_N_FLASH_PAGES * Flash::FLASH_PAGE_SIZE_BYTES);
@@ -411,8 +414,8 @@ int main() {
 
         // Execute the user code by jumping to offset 4 of the user's vector table (ResetHandler)
         // See ARMv7-M Architecture Reference Manual, section B1.5.2 Exception number definition
-        void (*userResetHandler)() = (void (*)())(userResetHandlerAddress);
-        userResetHandler();
+        volatile uint32_t* pc = (volatile uint32_t*)(BOOTLOADER_N_FLASH_PAGES * Flash::FLASH_PAGE_SIZE_BYTES + 0x04);
+        __asm__("LDR pc, %0" : : "m" (*pc));
     }
 }
 
