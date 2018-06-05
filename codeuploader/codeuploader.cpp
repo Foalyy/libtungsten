@@ -10,8 +10,12 @@
 using namespace std;
 using namespace boost;
 
-const uint16_t VENDOR_ID = 0x1209;
-const uint16_t PRODUCT_ID = 0xCA4B;
+// USB
+const uint16_t USB_VENDOR_ID = 0x1209;
+const uint16_t USB_PRODUCT_ID = 0xCA4B;
+
+// Serial
+const int USART_BAUDRATE = 115200;
 
 const bool DEBUG = false;
 
@@ -19,7 +23,7 @@ const bool DEBUG = false;
 enum class Request {
     START_BOOTLOADER,
     CONNECT,
-    STATUS,
+    GET_STATUS,
     WRITE,
     GET_ERROR,
 };
@@ -38,6 +42,8 @@ enum class BLError {
     PROTECTED_AREA,
     UNKNOWN_RECORD_TYPE,
     OVERFLOW,
+
+    NUMBER
 };
 string ERROR_STRINGS[] = {
     "NONE",
@@ -47,7 +53,7 @@ string ERROR_STRINGS[] = {
     "OVERFLOW",
 };
 
-//unsigned int parseHex(const string& str, int pos=0, int n=2);
+
 bool waitReady();
 void debug(const char* str);
 uint8_t ask(Request request, uint16_t value=0, uint16_t index=0);
@@ -83,7 +89,7 @@ int main(int argc, char** argv) {
         }
 
         // Try to find and open a device
-        r = usbOpenDevice(VENDOR_ID, PRODUCT_ID);
+        r = usbOpenDevice(USB_VENDOR_ID, USB_PRODUCT_ID);
         if (r == LIBUSB_ERROR_NO_DEVICE) {
             cout << "Device not found. Are you sure the cable is plugged and the bootloader is started?" << endl;
         }
@@ -102,7 +108,7 @@ int main(int argc, char** argv) {
         this_thread::sleep_for(chrono::milliseconds(2000));
 
         // Try to find and open the board again
-        r = usbOpenDevice(VENDOR_ID, PRODUCT_ID);
+        r = usbOpenDevice(USB_VENDOR_ID, USB_PRODUCT_ID);
         if (r < 0) {
             cout << "Unable to open device : error " << r << endl;
             usbExit();
@@ -116,11 +122,13 @@ int main(int argc, char** argv) {
         cout << "Connected to bootloader" << endl;
 
     } else { // Serial
+        // Open the serial port
         useSerial = true;
         cout << "Opening " << serialPortName << "..." << endl;
         serial.open(serialPortName);
-        serial.set_option(asio::serial_port_base::baud_rate(115200));
+        serial.set_option(asio::serial_port_base::baud_rate(USART_BAUDRATE));
         
+        // Connect to the bootloader with a SYN/ACK
         cout << "Connecting to bootloader... ";
         asio::write(serial, asio::buffer("SYN", 3));
         const int bufferSize = 3;
@@ -204,17 +212,18 @@ int main(int argc, char** argv) {
         }
 
         if (useSerial) {
-            // Wait for acknowledge every 5 frames
-            if (i % 5 == 4) {
-                char c = 0;
-                asio::read(serial, asio::buffer(&c, 1));
-                if (c != '0') {
-                    cout << "error " << c << endl;
-                    error = true;
-                    break;
+            // Wait for acknowledge
+            char c = 0;
+            asio::read(serial, asio::buffer(&c, 1));
+            if (c != '0') {
+                int e = c - '0';
+                if (e >= 0 && e < static_cast<int>(BLError::NUMBER)) {
+                    cerr << endl << "Error " << ERROR_STRINGS[e] << endl;
                 } else {
-                    //cout << "OK" << endl;
+                    cerr << endl << "Error " << static_cast<int>(c) << endl;
                 }
+                error = true;
+                break;
             }
         }
     }
@@ -236,12 +245,16 @@ uint8_t ask(Request request, uint16_t value, uint16_t index) {
 }
 
 Status askStatus() {
-    Status status = static_cast<Status>(ask(Request::STATUS));
+    Status status = static_cast<Status>(ask(Request::GET_STATUS));
     if (status == Status::ERROR) {
-        BLError error = static_cast<BLError>(ask(Request::GET_ERROR));
-        cout << "Error " << ERROR_STRINGS[static_cast<int>(error)] << endl;
-        if (error == BLError::PROTECTED_AREA) {
-            cout << "This HEX file contains data required to be placed in the protected area at the beginning of the internal Flash where"
+        int error = ask(Request::GET_ERROR);
+        if (error >= 0 && error < static_cast<int>(BLError::NUMBER)) {
+            cerr << "Error " << ERROR_STRINGS[error] << endl;
+        } else {
+            cerr << "Error " << error << endl;
+        }
+        if (static_cast<BLError>(error) == BLError::PROTECTED_AREA) {
+            cerr << "This HEX file contains data required to be placed in the protected area at the beginning of the internal Flash where"
             " the bootloader lives. Make sure you have compiled with BOOTLOADER=true." << endl;
         }
     }

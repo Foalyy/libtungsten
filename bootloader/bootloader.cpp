@@ -172,9 +172,10 @@ int main() {
         // Wait for instructions on any enabled channel
         Core::Time lastTimeLedToggled = 0;
         GPIO::PinState ledState = !LED_POLARITY;
+        Core::Time lastUSARTActivity = 0;
         while (!_exitBootloader) {
             // Blink rapidly
-            if (LED_BL_ENABLED && Core::time() > lastTimeLedToggled + LED_BL_BLINK_DELAY) {
+            if (LED_BL_ENABLED && Core::time() > lastTimeLedToggled + (_connected ? LED_BL_BLINK_DELAY_CONNECTED : LED_BL_BLINK_DELAY_STANDBY)) {
                 ledState = !ledState;
                 GPIO::set(PIN_LED_BL, ledState);
                 lastTimeLedToggled = Core::time();
@@ -199,6 +200,7 @@ int main() {
                         // Connected!
                         _connected = true;
                         _activeChannel = Channel::USART;
+                        lastUSARTActivity = Core::time();
 
                     } else {
                         // Flush a byte
@@ -210,24 +212,52 @@ int main() {
 
             } else { // Connected
                 // Read incoming data in USART mode
-                if (_activeChannel == Channel::USART && USART::available(USART_PORT)) {
-                    char c = USART::read(USART_PORT);
-                    if (_bufferCursor == 0) {
-                        if (c == ':') {
-                            // Start of a new frame
-                            _buffer[0] = c;
-                            _bufferCursor++;
-                        } // Otherwise, ignore the byte
+                if (_activeChannel == Channel::USART) {
+                    while (USART::available(USART_PORT)) {
+                        lastUSARTActivity = Core::time();
 
-                    } else {
-                        if (c == '\n') {
-                            // End of frame
-                            _bufferFull = true;
-                            _frameCounter++;
+                        char c = USART::read(USART_PORT);
+                        if (_bufferCursor == 0) {
+                            if (c == ':') {
+                                // Start of a new frame
+                                _buffer[0] = c;
+                                _bufferCursor++;
+                            } // Otherwise, ignore the byte
+
                         } else {
-                            _buffer[_bufferCursor] = c;
-                            _bufferCursor++;
+                            if (c == '\n') {
+                                // End of frame
+                                _bufferFull = true;
+                                _frameCounter++;
+                                break;
+                            } else {
+                                _buffer[_bufferCursor] = c;
+                                _bufferCursor++;
+                                if (_bufferCursor > BUFFER_SIZE) {
+                                    // Error
+                                    _status = Status::ERROR;
+                                    _error = BLError::OVERFLOW;
+                                    if (LED_ERROR_ENABLED) {
+                                        GPIO::set(PIN_LED_ERROR, LED_POLARITY);
+                                    }
+                                    if (_activeChannel == Channel::USART) {
+                                        USART::write(USART_PORT, (char)('0' + static_cast<int>(_error)));
+                                    }
+                                    while (1); // Stall
+                                }
+                            }
                         }
+                    }
+
+                    // Timeout to disconnect the serial connection after some
+                    // time of inactivity. This allows the procedure to be restarted
+                    // if the transfer fails, without the need to reset the bootloader.
+                    if (Core::time() >= lastUSARTActivity + USART_TIMEOUT) {
+                        _connected = false;
+                        _frameCounter = 0;
+                        _bufferCursor = 0;
+                        _bufferFull = false;
+                        memset(pageBuffer, 0, PAGE_BUFFER_SIZE);
                     }
                 }
                 
@@ -268,7 +298,7 @@ int main() {
                             GPIO::set(PIN_LED_ERROR, LED_POLARITY);
                         }
                         if (_activeChannel == Channel::USART) {
-                            USART::write(USART_PORT, "CHECKSUM_MISMATCH");
+                            USART::write(USART_PORT, (char)('0' + static_cast<int>(_error)));
                         }
                         while (1); // Stall
                     }
@@ -284,7 +314,7 @@ int main() {
                                 GPIO::set(PIN_LED_ERROR, LED_POLARITY);
                             }
                             if (_activeChannel == Channel::USART) {
-                                USART::write(USART_PORT, "PROTECTED_AREA");
+                                USART::write(USART_PORT, (char)('0' + static_cast<int>(_error)));
                             }
                             while (1); // Stall
                         }
@@ -349,17 +379,18 @@ int main() {
                             GPIO::set(PIN_LED_ERROR, LED_POLARITY);
                         }
                         if (_activeChannel == Channel::USART) {
-                            USART::write(USART_PORT, "UNKNOWN_RECORD_TYPE");
+                            USART::write(USART_PORT, (char)('0' + static_cast<int>(_error)));
                         }
                         while (1); // Stall
                     }
 
                     _bufferFull = false;
                     _bufferCursor = 0;
+                    memset(_buffer, 0, BUFFER_SIZE);
 
-                    // In USART mode, send acknowledge every 5 frames
-                    if (_activeChannel == Channel::USART && _frameCounter == 5) {
-                        USART::write(USART_PORT, "ACK");
+                    // In USART mode, send acknowledge every frame
+                    if (_activeChannel == Channel::USART) {
+                        USART::write(USART_PORT, (char)('0' + static_cast<int>(_error)));
                         _frameCounter = 0;
                     }
                     _status = Status::READY;

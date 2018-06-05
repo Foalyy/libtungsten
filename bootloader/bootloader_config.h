@@ -42,6 +42,7 @@ const USART::Port USART_PORT = USART::Port::USART0;
 const int USART_BAUDRATE = 115200;
 const GPIO::Pin USART_PIN_RX = {GPIO::Port::A, 11, GPIO::Periph::A};
 const GPIO::Pin USART_PIN_TX = {GPIO::Port::A, 12, GPIO::Periph::A};
+const int USART_TIMEOUT = 3000;
 
 // The bootloader can flash some LEDs to show its status. These can be enabled/disabled
 // and customized here. The LED_POLARITY option specifies the state to set to turn the
@@ -53,6 +54,7 @@ const GPIO::Pin PIN_LED_WRITE = GPIO::PA02; // Blue led on Carbide
 const bool LED_ERROR_ENABLED = true;
 const GPIO::Pin PIN_LED_ERROR = GPIO::PA00; // Red led on Carbide
 const GPIO::PinState LED_POLARITY = GPIO::LOW;
-const unsigned int LED_BL_BLINK_DELAY = 80; // ms
+const unsigned int LED_BL_BLINK_DELAY_STANDBY = 200; // ms
+const unsigned int LED_BL_BLINK_DELAY_CONNECTED = 50; // ms
 
 #endif
