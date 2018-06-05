@@ -102,9 +102,11 @@ endif
 LFLAGS=--specs=nano.specs --specs=nosys.specs -L. -L$(ROOTDIR)/$(LIBNAME) -L$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) -L$(ROOTDIR)/$(LIBNAME)/carbide -L$(ROOTDIR)/$(LIBNAME)/ld_scripts -T $(LD_SCRIPT_NAME) -Wl,--gc-sections $(MAP)
 
 
+
 ### RULES
 
 .PHONY: flash pause reset debug flash-debug codeuploader upload bootloader flash-bootloader debug-bootloader openocd clean clean-all _echo_config _echo_comp_lib_objs _echo_comp_user_objs
+
 
 ## Usercode-related rules
 
@@ -169,6 +171,7 @@ flash: $(NAME).hex
 	@echo "== Flashing into chip (make sure OpenOCD is started in background using 'make openocd')"
 	echo "reset halt; flash write_image erase unlock $(NAME).hex; reset run; exit" | netcat localhost 4444
 
+# Flash the firmware into the chip by automatically starting a temporary OpenOCD instance
 autoflash: $(NAME).hex
 	$(OPENOCD) -f $(OPENOCD_CFG) & (sleep 1; echo "reset halt; flash write_image erase unlock $(NAME).hex; reset run; exit" | netcat localhost 4444) > /dev/null; killall openocd
 
@@ -191,7 +194,9 @@ reset:
 debug: pause
 	$(GDB) -ex "set print pretty on" -ex "target extended-remote localhost:3333" $(NAME).elf
 
+# Flash and debug the firmware
 flash-debug: flash debug
+
 
 ## Codeuploader-related rules
 
@@ -222,16 +227,21 @@ bootloader:
 flash-bootloader: bootloader
 	echo "reset halt; flash write_image erase unlock $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.hex; reset run; exit" | netcat localhost 4444
 
+# Flash the bootloader into the chip by automatically starting a temporary OpenOCD instance
+autoflash-bootloader: bootloader
+	$(OPENOCD) -f $(OPENOCD_CFG) & (sleep 1; echo "reset halt; flash write_image erase unlock $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.hex; reset run; exit" | netcat localhost 4444) > /dev/null; killall openocd
+
 # Debug the bootloader
 debug-bootloader: pause
 	$(GDB) -ex "set print pretty on" -ex "target extended-remote localhost:3333" $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.elf
 
+# Flash and debug the bootloader
 flash-debug-bootloader: flash-bootloader debug-bootloader
 
 ## Cleaning rules
 
 # The 'clean' rule can be redefined in your Makefile to add your own logic, but remember :
-# 1/ to define it AFTER the 'include libtungsten/Makefile' rule
+# 1/ to define it AFTER the 'include libtungsten/Makefile' instruction
 # 2/ to add the 'clean-all' dependency
 clean: clean-all
 
