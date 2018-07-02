@@ -18,7 +18,8 @@ namespace SPI {
 
     int _rxDMAChannel = -1;
     int _txDMAChannel = -1;
-    int _nSlaves = 0;
+    const int N_SLAVES_MAX = 4;
+    bool _enabledSlaves[N_SLAVES_MAX] = {false, false, false, false};
 
     // Used for the DMA channel
     const int DUMMY_BYTES_SIZE = 64;
@@ -84,13 +85,17 @@ namespace SPI {
         PM::disablePeripheralClock(PM::CLK_SPI);
     }
 
-    Slave addSlave(Mode mode) {
-        if (_nSlaves >= 4) {
-            Error::happened(Error::Module::SPI, ERR_TOO_MANY_SLAVES, Error::Severity::CRITICAL);
-            return -1;
+    bool enableSlave(Slave slave, Mode mode) {
+        if (slave >= N_SLAVES_MAX) {
+            Error::happened(Error::Module::SPI, ERR_INVALID_SLAVE, Error::Severity::CRITICAL);
+            return false;
+        } else if (_enabledSlaves[slave]) {
+            Error::happened(Error::Module::SPI, ERR_SLAVE_ALREADY_ENABLED, Error::Severity::CRITICAL);
+            return false;
         }
+        _enabledSlaves[slave] = true;
 
-        switch (_nSlaves) {
+        switch (slave) {
             case 0:
                 GPIO::enablePeripheral(PIN_NPCS0);
                 break;
@@ -113,7 +118,7 @@ namespace SPI {
         uint8_t ncpha = !(static_cast<int>(mode) & 0b01);
 
         // CSRn (Chip Select Register n) : configure the slave-specific settings
-        (*(volatile uint32_t*)(SPI_BASE + OFFSET_CSR0 + _nSlaves * 0x04))
+        (*(volatile uint32_t*)(SPI_BASE + OFFSET_CSR0 + slave * 0x04))
             = cpol << CSR_CPOL      // CPOL : clock polarity
             | ncpha << CSR_NCPHA    // CPHA : clock phase
             | 0 << CSR_CSNAAT       // CSNAAT : CS doesn't rise between two consecutive transfers
@@ -123,8 +128,7 @@ namespace SPI {
             | 0 << CSR_DLYBS        // DLYBS : no delay between CS assertion and first clock cycle
             | 0 << CSR_DLYBCT;      // DLYBCT : no delay between consecutive transfers
 
-        _nSlaves++;
-        return _nSlaves - 1;
+        return true;
     }
 
     uint8_t transfer(Slave slave, uint8_t tx, bool next) {

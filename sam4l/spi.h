@@ -70,7 +70,8 @@ namespace SPI {
     const uint32_t WPCR_KEY = 0x535049 << 8;
 
     // Error codes
-    const Error::Code ERR_TOO_MANY_SLAVES = 0x0001;
+    const Error::Code ERR_INVALID_SLAVE = 0x0001;
+    const Error::Code ERR_SLAVE_ALREADY_ENABLED = 0x0002;
     
     // Static values
     enum class Mode {
@@ -95,7 +96,7 @@ namespace SPI {
 
     // Module API
     void enableMaster();
-    Slave addSlave(Mode mode=Mode::MODE0);
+    bool enableSlave(Slave slave, Mode mode=Mode::MODE0);
     uint8_t transfer(Slave slave, uint8_t tx=0, bool next=false);
     void transfer(Slave slave, uint8_t* txBuffer, uint8_t* rxBuffer, int size, int sizeRx=-1, bool partial=false);
     void setPin(PinFunction function, GPIO::Pin pin);
