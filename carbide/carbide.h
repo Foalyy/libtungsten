@@ -42,6 +42,7 @@ namespace Carbide {
     void onButtonPressed(void (*handler)(), bool released=false);
     inline bool buttonRisingEdge() { return GPIO::fallingEdge(PIN_BUTTON); } // Rising/falling are also inverted for the same reasons
     inline bool buttonFallingEdge() { return GPIO::risingEdge(PIN_BUTTON); }
+    inline void waitButtonPressed() { while (!buttonRisingEdge()); }
 
 }
 

@@ -33,6 +33,10 @@ uint8_t RingBuffer::read() {
         return 0;
     }
 
+    // Clear overflow status
+    _overflow = false;
+
+    // Get the next byte and move the cursor
     uint8_t byte = _buffer[_cursorR];
     _cursorR++;
     if (_cursorR >= _capacity) {
@@ -46,11 +50,18 @@ uint8_t RingBuffer::read() {
 
 // Read some bytes from the internal buffer
 int RingBuffer::read(uint8_t* buffer, unsigned int size) {
+    if (size == 0) {
+        return 0;
+    }
+    
     // If the internal buffer is empty, return immediately
     if (_empty) {
         _underflow = true;
         return 0;
     }
+
+    // Clear overflow status
+    _overflow = false;
 
     // If the requested number of bytes is greater than the
     // current size, read only what is available and set the
@@ -89,8 +100,10 @@ void RingBuffer::write(uint8_t byte) {
     // Check for overflow
     if (size() + 1 > _capacity) {
         _overflow = true;
-        return;
     }
+
+    // Clear underflow status
+    _underflow = false;
 
     // Copy the byte and move the cursor
     _buffer[_cursorW] = byte;
@@ -98,16 +111,28 @@ void RingBuffer::write(uint8_t byte) {
     if (_cursorW >= _capacity) {
         _cursorW = 0;
     }
+
+    // If the buffer is in overflow state, put the R cursor at the W cursor
+    if (_overflow) {
+        _cursorR = _cursorW;
+    }
+
     _empty = false;
 }
 
 // Write some bytes into the internal buffer
 void RingBuffer::write(const uint8_t* buffer, unsigned int size) {
+    if (size == 0) {
+        return;
+    }
+
     // Check for overflow
     if (RingBuffer::size() + size > _capacity) {
         _overflow = true;
-        return;
     }
+
+    // Clear underflow status
+    _underflow = false;
 
     // Copy data into the internal buffer
     if (_cursorW + size <= _capacity) {
@@ -118,15 +143,33 @@ void RingBuffer::write(const uint8_t* buffer, unsigned int size) {
         }
 
     } else {
+        // If the given size is larger than the capacity, keep only the last bytes
+        unsigned int bufferOffset = 0;
+        if (size > _capacity) {
+            bufferOffset = size - _capacity;
+            size = _capacity;
+        }
+
+        // Copy the first part to the end of the buffer
         unsigned int size2 = _capacity - _cursorW;
         if (size2 > 0) {
-            memcpy(_buffer + _cursorW, buffer, size2);
+            memcpy(_buffer + _cursorW, buffer + bufferOffset, size2);
         }
+
+        // Copy the last part to the beginning of the buffer
         if (size - size2 > 0) {
-            memcpy(_buffer, buffer + size2, size - size2);
+            memcpy(_buffer, buffer + bufferOffset + size2, size - size2);
         }
+
+        // Move the cursor
         _cursorW = size - size2;
     }
+
+    // If the buffer is in overflow state, put the R cursor at the W cursor
+    if (_overflow) {
+        _cursorR = _cursorW;
+    }
+
     _empty = false;
 }
 

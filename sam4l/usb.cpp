@@ -663,8 +663,6 @@ namespace USB {
 
     // Enable the IN interrupt on the specified endpoint
     void enableINInterrupt(Endpoint endpointNumber) {
-        //(*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR + endpointNumber * 4))
-        //    = 1 << UESTA_TXINI;
         (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0SET + endpointNumber * 4))
             = 1 << UECON_TXINE;
     }
@@ -682,10 +680,30 @@ namespace USB {
 
     // Disable the IN interrupt on the specified endpoint
     void disableINInterrupt(Endpoint endpointNumber) {
-        //(*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR + endpointNumber * 4))
-        //    = 1 << UESTA_TXINI;
         (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0CLR + endpointNumber * 4))
             = 1 << UECON_TXINE;
+    }
+
+    // Return true if the IN interrupt is enabled on the specified endpoint
+    bool isINInterruptEnabled(Endpoint endpointNumber) {
+        return (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0 + endpointNumber * 4)) & (1 << UECON_TXINE);
+    }
+
+    // Enable the OUT interrupt on the specified endpoint
+    void enableOUTInterrupt(Endpoint endpointNumber) {
+        (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0SET + endpointNumber * 4))
+            = 1 << UECON_RXOUTE;
+    }
+
+    // Disable the OUT interrupt on the specified endpoint
+    void disableOUTInterrupt(Endpoint endpointNumber) {
+        (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0CLR + endpointNumber * 4))
+            = 1 << UECON_RXOUTE;
+    }
+
+    // Return true if the OUT interrupt is enabled on the specified endpoint
+    bool isOUTInterruptEnabled(Endpoint endpointNumber) {
+        return (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0 + endpointNumber * 4)) & (1 << UECON_RXOUTE);
     }
 
     // User handlers

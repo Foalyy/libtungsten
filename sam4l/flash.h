@@ -21,7 +21,7 @@ namespace Flash {
     const uint32_t OFFSET_FSR =         0x08; // Flash Status Register
     const uint32_t OFFSET_FPR =         0x0C; // Flash Parameter Register
     const uint32_t OFFSET_FVR =         0x10; // Flash Version Register
-    const uint32_t OFFSET_FGPFRHI =     0x14; // Flash General Purpose Fuse Register Hi
+    const uint32_t OFFSET_FGPFRHI =     0x14; // Flash General Purpose Fuse Register Hi -- not implemented
     const uint32_t OFFSET_FGPFRLO =     0x18; // Flash General Purpose Fuse Register Lo
     const uint32_t OFFSET_CTRL =        0x408; // PicoCache Control Register
     const uint32_t OFFSET_SR =          0x40C; // PicoCache Status Register
@@ -60,7 +60,7 @@ namespace Flash {
 
     // General-purpose fuses
     using Fuse = uint8_t;
-    const int N_FUSES = 48;
+    const int N_FUSES = 16;
 
     // These fuses are used by the bootloader and are reserved if the bootloader is enabled
     // They need to be defined here for the Core::resetToBootloader() helper function

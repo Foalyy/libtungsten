@@ -45,6 +45,10 @@ namespace Error {
         return nErrors;
     }
 
+    const Error& get(unsigned int n) {
+        return errors[n];
+    }
+
     const Error& getLast() {
         return errors[nErrors - 1];
     }

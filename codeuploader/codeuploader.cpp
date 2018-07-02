@@ -11,8 +11,8 @@ using namespace std;
 using namespace boost;
 
 // USB
-const uint16_t USB_VENDOR_ID = 0x1209;
-const uint16_t USB_PRODUCT_ID = 0xCA4B;
+const uint16_t USB_VENDOR_ID = 0x03eb;
+const uint16_t USB_PRODUCT_ID = 0xcabd;
 
 // Serial
 const int USART_BAUDRATE = 115200;

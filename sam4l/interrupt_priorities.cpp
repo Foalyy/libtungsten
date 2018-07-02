@@ -54,3 +54,7 @@ namespace USART {
 namespace USB {
     uint8_t INTERRUPT_PRIORITY = 8;
 }
+
+namespace WDT {
+    uint8_t INTERRUPT_PRIORITY = 3;
+}

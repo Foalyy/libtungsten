@@ -39,6 +39,9 @@ namespace Core {
     const uint32_t NVIC_IABR0 = 0xE000E300; // Interrupt Active Bit Register 0
     const uint32_t NVIC_IPR0 = 0xE000E400;  // Interrupt Priority Register 0
 
+    // Peripheral Debug
+    const uint32_t PDBG = 0xE0042000; // Peripheral Debug Register
+
 
     // Subregisters
     const uint32_t SCR_SLEEPONEXIT = 1; // Enter sleep state when no interrupt is being handled
@@ -49,6 +52,9 @@ namespace Core {
     const uint32_t SYST_CSR_COUNTFLAG = 6; // SysTick timer has reached 0
     const uint32_t AIRCR_SYSRESETREQ = 2; // System reset request
     const uint32_t AIRCR_VECTKEY = 0x05FA << 16; // AIRCR access key
+    const uint32_t PDBG_WDT = 0; // Freeze WDT when Core is halted in debug mode
+    const uint32_t PDBG_AST = 1; // Freeze AST when Core is halted in debug mode
+    const uint32_t PDBG_PEVC = 2; // Freeze PEVX when Core is halted in debug mode
 
 
     // Exceptions

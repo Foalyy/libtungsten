@@ -115,7 +115,7 @@ namespace Flash {
             return;
         }
 
-        // The usable fuses are actually between 16 and 63, because the first 16 bits are lock bits
+        // The usable fuses are actually between 16 and 31, because the first 16 bits are lock bits
         fuse += 16;
 
         // FCMD (Flash Command Register) : issue a Write User Page command
@@ -134,7 +134,7 @@ namespace Flash {
             return false;
         }
 
-        // The usable fuses are actually between 16 and 63, because the first 16 bits are lock bits
+        // The usable fuses are actually between 16 and 31, because the first 16 bits are lock bits
         fuse += 16;
         bool high = false;
         if (fuse >= 32) {

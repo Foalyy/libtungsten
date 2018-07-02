@@ -200,7 +200,7 @@ flash-debug: flash debug
 
 # Show the disassembly of the compiled program
 objdump: $(NAME).hex
-	$(OBJDUMP) -d $(NAME).elf | less
+	$(OBJDUMP) -dSC $(NAME).elf | less
 
 
 ## Codeuploader-related rules
@@ -248,6 +248,17 @@ objdump-bootloader: bootloader
 	$(OBJDUMP) -d $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.elf | less
 
 
+## USBCom
+
+usbcom_dump:
+	make -C $(ROOTDIR)/$(LIBNAME)/usbcom usbcom_dump
+	$(ROOTDIR)/$(LIBNAME)/usbcom/usbcom_dump
+
+usbcom_write:
+	make -C $(ROOTDIR)/$(LIBNAME)/usbcom usbcom_write
+	$(ROOTDIR)/$(LIBNAME)/usbcom/usbcom_write
+
+
 ## Cleaning rules
 
 # The 'clean' rule can be redefined in your Makefile to add your own logic, but remember :
@@ -259,3 +270,4 @@ clean-all:
 	rm -f $(NAME).elf $(NAME).map $(NAME).hex *.o $(ROOTDIR)/$(LIBNAME)/*.o $(ROOTDIR)/$(LIBNAME)/utils/*.o $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/*.o $(ROOTDIR)/$(LIBNAME)/carbide/*.o
 	cd $(ROOTDIR)/$(LIBNAME)/bootloader; rm -f bootloader.elf bootloader.hex *.o
 	cd $(ROOTDIR)/$(LIBNAME)/codeuploader; rm -f codeuploader *.o
+	make -C $(ROOTDIR)/$(LIBNAME)/usbcom clean

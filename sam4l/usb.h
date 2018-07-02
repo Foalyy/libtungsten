@@ -242,8 +242,8 @@ namespace USB {
     const char16_t DEFAULT_SERIALNUMBER[] = u"beta";
 
     // Default descriptor ids
-    const uint16_t DEFAULT_VENDOR_ID = 0x1209;
-    const uint16_t DEFAULT_PRODUCT_ID = 0xCA4B;
+    const uint16_t DEFAULT_VENDOR_ID = 0x03eb; // Atmel Corp vendor ID
+    const uint16_t DEFAULT_PRODUCT_ID = 0xcabd;
     const uint16_t DEFAULT_DEVICE_REVISION = 0x0001;
 
 
@@ -337,19 +337,23 @@ namespace USB {
     // Module API
     void initDevice(uint16_t vendorId=DEFAULT_VENDOR_ID, uint16_t productId=DEFAULT_PRODUCT_ID, uint16_t deviceRevision=DEFAULT_DEVICE_REVISION);
     Endpoint newEndpoint(EPType type, EPDir direction, EPBanks nBanks, EPSize size, uint8_t* bank0, uint8_t* bank1=nullptr);
-    void setEndpointHandler(Endpoint endpointNumber, EPHandlerType handlerType, int (*handler)(int));
-    void enableINInterrupt(Endpoint endpointNumber);
-    void disableINInterrupt(Endpoint endpointNumber);
-    void abortINTransfer(Endpoint endpointNumber);
     void setConnectedHandler(void (*handler)());
     void setDisconnectedHandler(void (*handler)());
     void setStartOfFrameHandler(void (*handler)());
     void setControlHandler(int (*handler)(SetupPacket &_lastSetupPacket, uint8_t* data, int size));
+    void setEndpointHandler(Endpoint endpointNumber, EPHandlerType handlerType, int (*handler)(int));
+    void enableINInterrupt(Endpoint endpointNumber);
+    void abortINTransfer(Endpoint endpointNumber);
+    void disableINInterrupt(Endpoint endpointNumber);
+    bool isINInterruptEnabled(Endpoint endpointNumber);
+    void enableOUTInterrupt(Endpoint endpointNumber);
+    void disableOUTInterrupt(Endpoint endpointNumber);
+    bool isOUTInterruptEnabled(Endpoint endpointNumber);
+    void remoteWakeup();
     void interruptHandler();
     int ep0SETUPHandler(int unused);
     int ep0INHandler(int unused);
     int ep0OUTHandler(int size);
-    void remoteWakeup();
 }
 
 #endif

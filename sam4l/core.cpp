@@ -43,6 +43,12 @@ namespace Core {
         // Change the core vector pointer to the new table
         (*(volatile uint32_t*) VTOR) = (uint32_t) _isrVector;
 
+        // Configure the Peripheral Debug register
+        (*(volatile uint32_t*) PDBG)
+            = 1 << PDBG_WDT     // Freeze WDT when Core is halted in debug mode
+            | 0 << PDBG_AST     // Don't freeze AST when Core is halted in debug mode
+            | 0 << PDBG_PEVC;   // Don't freeze PEVC when Core is halted in debug mode
+
         // Init the error reporting system
         Error::init();
 
@@ -59,6 +65,9 @@ namespace Core {
         // Init the SysTick which is used as a high-speed time reference (based on CPU clock)
         // This is required by waitMicroseconds()
         enableSysTick();
+
+        // Clear the watchdog interrupt in case this was the cause of reset
+        WDT::clearInterrupt();
 
         // Init the stashed interrupts array
         memset(_nvicStash, 0, N_NVIC_IMPLEMENTED * sizeof(uint32_t));

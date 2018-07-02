@@ -50,6 +50,8 @@ namespace Error {
     void happened(Module module, Code code, Severity severity=Severity::CRITICAL);
     void happened(int userModule, int code, Severity severity=Severity::CRITICAL);
     unsigned int getNumber();
+    const Error& get(unsigned int n);
+    const Error& getLast();
 
 }
 
