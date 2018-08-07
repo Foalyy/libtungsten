@@ -32,6 +32,18 @@ namespace ADC {
         // Enable the clock
         PM::enablePeripheralClock(PM::CLK_ADC);
 
+        // Find a prescaler setting that will bring the module clock frequency below
+        // the maximum specified in the datasheet (42.9.4 Analog to Digital Converter
+        // Characteristics - ADC clock frequency - Max : 1.5MHz).
+        // A frequency too high may otherwise result in incorrect conversions.
+        unsigned long frequency = PM::getModuleClockFrequency(PM::CLK_ADC);
+        uint8_t prescal = 0;
+        for (prescal = 0b000; prescal <= 0b111; prescal++) {
+            if ((frequency >> (prescal + 2)) <= 1500000) { // 1.5MHz
+                break;
+            }
+        }
+
         // CR (Control Register) : enable the ADC
         (*(volatile uint32_t*)(ADC_BASE + OFFSET_CR))
             = 1 << CR_EN        // EN : enable ADC
@@ -43,7 +55,7 @@ namespace ADC {
             = static_cast<int>(analogReference) << CFG_REFSEL   // REFSEL : voltage reference
             | 0b11 << CFG_SPEED                                 // SPEED : 75ksps
             | 1 << CFG_CLKSEL                                   // CLKSEL : use APB clock
-            | 0b000 << CFG_PRESCAL;                             // PRESCAL : divide clock by 4
+            | prescal << CFG_PRESCAL;                           // PRESCAL : divide clock by 4
 
         // SR (Status Register) : wait for enabled status flag
         while (!((*(volatile uint32_t*)(ADC_BASE + OFFSET_SR)) & (1 << SR_EN)));

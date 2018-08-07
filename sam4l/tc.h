@@ -148,6 +148,8 @@ namespace TC {
     void setPeriod(const Channel& channel, double period);
     void setHighTime(const Channel& channel, double highTime);
     void setDutyCycle(const Channel& channel, int percent);
+    void enableOutput(const Channel& channel);
+    void disableOutput(const Channel& channel);
     void setRC(const Channel& channel, uint16_t rc);
     void setRX(const Channel& channel, uint16_t rx);
     uint32_t getCounterValue(const Channel& channel);

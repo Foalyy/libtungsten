@@ -97,10 +97,21 @@ namespace TC {
         setRX(channel, highTime * 10 / basePeriod);
     }
 
+    // Set the duty cycle of the specified channel in percent
     void setDutyCycle(const Channel& channel, int percent) {
         uint32_t REG = TC_BASE + channel.tc * TC_SIZE + channel.subchannel * OFFSET_CHANNEL_SIZE;
         uint32_t rc = (*(volatile uint32_t*)(REG + OFFSET_RC0));
         setRX(channel, rc * percent / 100);
+    }
+
+    // Enable the output of the selected channel
+    void enableOutput(const Channel& channel) {
+        GPIO::enablePeripheral(PINS[channel.tc][N_LINES * channel.subchannel + channel.line]);
+    }
+
+    // Disable the output of the selected channel
+    void disableOutput(const Channel& channel) {
+        GPIO::disablePeripheral(PINS[channel.tc][N_LINES * channel.subchannel + channel.line]);
     }
 
     // Set the RC register which defines the period for both TIOA and TIOB of the given channel

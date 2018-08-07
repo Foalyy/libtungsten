@@ -13,6 +13,7 @@ private:
     unsigned int _highTime0;
     unsigned int _highTime100;
     unsigned int _percent;
+    bool _disabled;
 
     static const unsigned int DEFAULT_PERIOD = 10000;
     static const unsigned int DEFAULT_HIGH_TIME_0 = 1000;
@@ -25,6 +26,8 @@ public:
     // Set the servo position in percent
     // This will translate to differant angles according to the exact servo angular range
     void set(unsigned int percent);
+
+    void disable();
 
     // Customize the PWM timings
     // Passing no argument resets the default values

@@ -6,6 +6,10 @@ Servo::Servo(TC::Channel tcChannel, GPIO::Pin pin) {
     _tcChannel = tcChannel;
     _pin = pin;
 
+    // Default values
+    _percent = 50;
+    _disabled = true;
+
     // If a custom pin is specified, set it
     if (pin.number != 0xFF) {
         TC::setPin(tcChannel, TC::PinFunction::OUT, pin);
@@ -27,10 +31,16 @@ void Servo::set(unsigned int percent) {
     }
 
     // Save the value
+    _disabled = false;
     _percent = percent;
 
     // Compute and set the hightime
     TC::setHighTime(_tcChannel, _highTime0 + percent * (_highTime100 - _highTime0) / 100);
+}
+
+void Servo::disable() {
+    _disabled = true;
+    TC::setHighTime(_tcChannel, 0);
 }
 
 // Customize the PWM timings
@@ -41,9 +51,14 @@ void Servo::setPWMTimings(unsigned int highTime0, unsigned int highTime100, unsi
     _highTime100 = highTime100;
     _period = period;
 
+    // Reset the high time
+    TC::setHighTime(_tcChannel, 0);
+
     // Set the period
     TC::setPeriod(_tcChannel, period);
 
     // Recalculate the hightime based on the new timings
-    set(_percent);
+    if (!_disabled) {
+        set(_percent);
+    }
 }
