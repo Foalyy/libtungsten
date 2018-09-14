@@ -147,32 +147,32 @@ namespace SCIF {
 
 namespace SPI {
 
-    GPIO::Pin PIN_MISO =  {GPIO::Port::A, 21, GPIO::Periph::A};
-    GPIO::Pin PIN_MOSI =  {GPIO::Port::A, 22, GPIO::Periph::A};
-    GPIO::Pin PIN_SCK =   {GPIO::Port::A, 23, GPIO::Periph::A};
-    GPIO::Pin PIN_NPCS0 = {GPIO::Port::A, 24, GPIO::Periph::A};
-    GPIO::Pin PIN_NPCS1 = {GPIO::Port::A, 13, GPIO::Periph::C};
+    GPIO::Pin PIN_MISO =  {GPIO::Port::A, 27, GPIO::Periph::A};
+    GPIO::Pin PIN_MOSI =  {GPIO::Port::A, 28, GPIO::Periph::A};
+    GPIO::Pin PIN_SCK =   {GPIO::Port::A, 29, GPIO::Periph::A};
+    GPIO::Pin PIN_NPCS0 = {GPIO::Port::A, 30, GPIO::Periph::A};
+    GPIO::Pin PIN_NPCS1 = {GPIO::Port::A, 31, GPIO::Periph::A};
     GPIO::Pin PIN_NPCS2 = {GPIO::Port::A, 14, GPIO::Periph::C};
     GPIO::Pin PIN_NPCS3 = {GPIO::Port::A, 15, GPIO::Periph::C};
 
     // Alternatives for MISO
     //const GPIO::Pin PIN_MISO =  {GPIO::Port::A,  3, GPIO::Periph::B};
-    //const GPIO::Pin PIN_MISO =  {GPIO::Port::A, 27, GPIO::Periph::A};
+    //const GPIO::Pin PIN_MISO =  {GPIO::Port::A, 21, GPIO::Periph::A};
     //const GPIO::Pin PIN_MISO =  {GPIO::Port::B, 14, GPIO::Periph::B};
 
     // Alternatives for MOSI
-    //const GPIO::Pin PIN_MOSI =  {GPIO::Port::A, 28, GPIO::Periph::A};
+    //const GPIO::Pin PIN_MOSI =  {GPIO::Port::A, 22, GPIO::Periph::A};
     //const GPIO::Pin PIN_MOSI =  {GPIO::Port::B, 15, GPIO::Periph::B};
 
     // Alternatives for SCK
-    //const GPIO::Pin PIN_SCK =   {GPIO::Port::A, 29, GPIO::Periph::A};
+    //const GPIO::Pin PIN_SCK =   {GPIO::Port::A, 23, GPIO::Periph::A};
 
     // Alternatives for NPCS0
     //const GPIO::Pin PIN_NPCS0 = {GPIO::Port::A,  2, GPIO::Periph::B};
-    //const GPIO::Pin PIN_NPCS0 = {GPIO::Port::A, 30, GPIO::Periph::A};
+    //const GPIO::Pin PIN_NPCS0 = {GPIO::Port::A, 24, GPIO::Periph::A};
 
     // Alternatives for NPCS1
-    //const GPIO::Pin PIN_NPCS1 = {GPIO::Port::A, 31, GPIO::Periph::A};
+    //const GPIO::Pin PIN_NPCS1 = {GPIO::Port::A, 13, GPIO::Periph::C};
     //const GPIO::Pin PIN_NPCS1 = {GPIO::Port::B, 13, GPIO::Periph::B};
 
     // Alternatives for NPCS2
