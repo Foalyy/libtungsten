@@ -16,6 +16,7 @@ namespace SPI {
     extern struct GPIO::Pin PIN_NPCS2;
     extern struct GPIO::Pin PIN_NPCS3;
 
+    bool _enabled = false;
     int _rxDMAChannel = -1;
     int _txDMAChannel = -1;
     const int N_SLAVES_MAX = 4;
@@ -32,7 +33,13 @@ namespace SPI {
     void txDMAReloadEmptyHandler();
 
 
-    void enableMaster() {
+    void enable() {
+        // If the controller is already enabled, exit immediately
+        if (_enabled) {
+            return;
+        }
+        _enabled = true;
+
         // Initialize the dummy bytes buffer to 0
         memset(DUMMY_BYTES, 0, sizeof(DUMMY_BYTES));
         
@@ -68,7 +75,9 @@ namespace SPI {
         _txDMAChannel = DMA::newChannel(DMA::Device::SPI_TX, DMA::Size::BYTE);
     }
 
-    void disableMaster() {
+    void disable() {
+        _enabled = false;
+        
         // Free the pins
         GPIO::disablePeripheral(PIN_MISO);
         GPIO::disablePeripheral(PIN_MOSI);
@@ -86,6 +95,9 @@ namespace SPI {
     }
 
     bool enableSlave(Slave slave, Mode mode) {
+        // Make sure the controller is enabled
+        enable();
+
         if (slave >= N_SLAVES_MAX) {
             Error::happened(Error::Module::SPI, ERR_INVALID_SLAVE, Error::Severity::CRITICAL);
             return false;

@@ -35,7 +35,7 @@ namespace DAC {
 namespace EIC {
 
     GPIO::Pin PINS[] = {
-        {}, // EXTINT0/NMI isn't available on this packages
+        {}, // EXTINT0/NMI isn't available on this package
         {GPIO::Port::A,  6, GPIO::Periph::C}, // EXTINT1
         {GPIO::Port::A,  4, GPIO::Periph::C}, // EXTINT2
         {GPIO::Port::A,  5, GPIO::Periph::C}, // EXTINT3

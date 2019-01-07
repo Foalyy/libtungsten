@@ -95,8 +95,9 @@ namespace SPI {
 
 
     // Module API
-    void enableMaster();
-    bool enableSlave(Slave slave, Mode mode=Mode::MODE0);
+    void enable();
+    void disable();
+    bool enable(Slave slave, Mode mode=Mode::MODE0);
     uint8_t transfer(Slave slave, uint8_t tx=0, bool next=false);
     void transfer(Slave slave, uint8_t* txBuffer, uint8_t* rxBuffer, int size, int sizeRx=-1, bool partial=false);
     void setPin(PinFunction function, GPIO::Pin pin);
