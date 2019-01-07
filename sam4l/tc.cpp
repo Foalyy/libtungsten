@@ -175,7 +175,7 @@ namespace TC {
         }
 
         // Software trigger
-        //(*(volatile uint32_t*)(REG + OFFSET_CCR0)) = 1 << CCR_SWTRG;
+        (*(volatile uint32_t*)(REG + OFFSET_CCR0)) = 1 << CCR_SWTRG;
 
         // WPMR (Write Protect Mode Register) : re-enable write protect
         (*(volatile uint32_t*)(TC_BASE + channel.tc * TC_SIZE + OFFSET_WPMR))
