@@ -56,7 +56,7 @@ namespace USB {
         .bDescriptorType = 0x02,
         .wTotalLength = 18,
         .bNumInterfaces = 1,
-        .bConfigurationValue = 0,
+        .bConfigurationValue = 1,
         .iConfiguration = 0,
         .bmAttributes = 0xA0, // TODO : bus power settings
         .bMaxPower = 150 // In units of 2mA, therefore 300mA
@@ -102,6 +102,7 @@ namespace USB {
             .bString = DEFAULT_SERIALNUMBER
         }
     };
+    char16_t _customStringDescriptors[static_cast<int>(StringDescriptors::NUMBER)][MAX_STRING_DESCRIPTOR_SIZE];
 
     extern uint8_t INTERRUPT_PRIORITY;
 
@@ -179,6 +180,22 @@ namespace USB {
         Core::enableInterrupt(Core::Interrupt::USBC, INTERRUPT_PRIORITY);
     }
 
+    void setStringDescriptor(StringDescriptors descriptor, const char* string, int size) {
+        if (size > MAX_STRING_DESCRIPTOR_SIZE) {
+            size = MAX_STRING_DESCRIPTOR_SIZE;
+        }
+        char16_t* customString = _customStringDescriptors[static_cast<int>(descriptor)];
+        for (int i = 0; i < size; i++) {
+            if (string[i] == 0) {
+                size = i;
+                break;
+            }
+            customString[i] = string[i];
+        }
+        _stringDescriptors[static_cast<int>(descriptor)].bLength = 2 * size + 2;
+        _stringDescriptors[static_cast<int>(descriptor)].bString = customString;
+    }
+
 
     // Initialize an endpoint
     Endpoint newEndpoint(EPType type, EPDir direction, EPBanks nBanks, EPSize size, uint8_t* bank0, uint8_t* bank1) {
@@ -219,7 +236,7 @@ namespace USB {
             ep->descriptor.bEndpointAddress = n | ((direction == EPDir::IN ? 1 : 0) << 7);
             ep->descriptor.bmAttributes = static_cast<int>(type);
             ep->descriptor.wMaxPacketSize = EP_SIZES[static_cast<int>(size)];
-            ep->descriptor.bInterval = 0;
+            ep->descriptor.bInterval = 10;
 
             // Set up descriptor for bank0
             //memset(bank0, 0, EP_SIZES[static_cast<int>(size)]);
@@ -454,10 +471,16 @@ namespace USB {
             .handled = false
         };
 
+        // Kill any pending IN transfer
+        abortINTransfer(0);
+
         // If this is an IN or No Data transfer
         if (_lastSetupPacket.direction == EPDir::IN || _lastSetupPacket.wLength == 0) {
             // Enable the IN interrupt to answer this request (or ACK it with a ZLP for a No Data transfer)
             enableINInterrupt(0);
+        } else {
+            // Disable the IN interrupt to allow the OUT handler to be called
+            disableINInterrupt(0);
         }
 
         // Mark that a SETUP packet has been received
@@ -608,6 +631,9 @@ namespace USB {
                 // Call user handler if this is a IN or No Data request. For an OUT request with data,
                 // the user handler will be called by ep0OUTHandler() when the data has been received
                 if (_controlHandler != nullptr) {
+                    // Make sure the IN handler will not be called again when the IN response is sent
+                    disableINInterrupt(0);
+
                     if (_lastSetupPacket.direction == EPDir::IN || _lastSetupPacket.wLength == 0) {
                         int bytesToSend = _controlHandler(_lastSetupPacket, _bankEP0, _lastSetupPacket.wLength);
                         return min(_lastSetupPacket.wLength, bytesToSend);

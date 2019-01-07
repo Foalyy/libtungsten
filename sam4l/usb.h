@@ -228,6 +228,9 @@ namespace USB {
         uint8_t bDescriptorType;
         const char16_t* bString;
     };
+    extern DeviceDescriptor _deviceDescriptor;
+    extern ConfigurationDescriptor _configurationDescriptor;
+    extern InterfaceDescriptor _interfaceDescriptor;
 
     // String descriptors
     enum class StringDescriptors {
@@ -237,9 +240,12 @@ namespace USB {
 
         NUMBER // Number of string descriptors
     };
+    const int MAX_STRING_DESCRIPTOR_SIZE = 30;
     const char16_t DEFAULT_IMANUFACTURER[] = u"libtungsten";
     const char16_t DEFAULT_IPRODUCT[] = u"Carbide";
-    const char16_t DEFAULT_SERIALNUMBER[] = u"beta";
+    const char16_t DEFAULT_SERIALNUMBER[] = u"";
+    extern String0Descriptor _string0Descriptor;
+    extern StringDescriptor _stringDescriptors[];
 
     // Default descriptor ids
     const uint16_t DEFAULT_VENDOR_ID = 0x03eb; // Atmel Corp vendor ID
@@ -302,6 +308,7 @@ namespace USB {
     };
     using Endpoint = int; // Helper type to manage endpoints, created by newEndpoint()
     const Endpoint EP_ERROR = -1;
+    extern const int BANK_EP0_SIZE;
 
 
     // Packets
@@ -336,6 +343,7 @@ namespace USB {
 
     // Module API
     void initDevice(uint16_t vendorId=DEFAULT_VENDOR_ID, uint16_t productId=DEFAULT_PRODUCT_ID, uint16_t deviceRevision=DEFAULT_DEVICE_REVISION);
+    void setStringDescriptor(StringDescriptors descriptor, const char* string, int size);
     Endpoint newEndpoint(EPType type, EPDir direction, EPBanks nBanks, EPSize size, uint8_t* bank0, uint8_t* bank1=nullptr);
     void setConnectedHandler(void (*handler)());
     void setDisconnectedHandler(void (*handler)());
