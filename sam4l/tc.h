@@ -144,7 +144,7 @@ namespace TC {
 
 
     // Module API
-    void init(const Channel& channel, unsigned int period=0, unsigned int highTime=0, bool output=false);
+    void init(const Channel& channel, double period=0, double highTime=0, bool output=false);
     void setPeriod(const Channel& channel, double period);
     void setHighTime(const Channel& channel, double highTime);
     void setDutyCycle(const Channel& channel, int percent);
@@ -153,7 +153,7 @@ namespace TC {
     void setRC(const Channel& channel, uint16_t rc);
     void setRX(const Channel& channel, uint16_t rx);
     uint32_t getCounterValue(const Channel& channel);
-    void wait(const Channel& channel, unsigned long value, Unit unit=Unit::MILLISECONDS);
+    void wait(const Channel& channel, unsigned long delay, Unit unit=Unit::MILLISECONDS);
     void execDelayed(const Channel& channel, void (*handler)(), unsigned long delay, bool repeat=false, Unit unit=Unit::MILLISECONDS);
     void setPin(const Channel& channel, PinFunction function, GPIO::Pin pin);
 

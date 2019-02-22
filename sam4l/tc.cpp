@@ -24,7 +24,7 @@ namespace TC {
     void execDelayedHandlerWrapper();
 
     // Initialize a TC channel with the given period and hightime in microseconds
-    void init(const Channel& channel, unsigned int period, unsigned int highTime, bool output) {
+    void init(const Channel& channel, double period, double highTime, bool output) {
         uint32_t REG = TC_BASE + channel.tc * TC_SIZE + channel.subchannel * OFFSET_CHANNEL_SIZE;
 
         // Enable the module clock

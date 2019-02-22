@@ -6,8 +6,7 @@
 
 // Serial Peripheral Interface
 // This module allows the chip to communicate through an SPI interface,
-// either as a Master or a Slave (even though only Master mode is currently
-// supported by the driver).
+// either as a Master or a Slave.
 // SPI is faster than I2C, but uses more wires and can connect to less
 // peripherals at the same time.
 namespace SPI {
@@ -69,9 +68,13 @@ namespace SPI {
     // Constants
     const uint32_t WPCR_KEY = 0x535049 << 8;
 
+    const int N_PERIPHERALS_MAX = 4;
+
     // Error codes
-    const Error::Code ERR_INVALID_SLAVE = 0x0001;
-    const Error::Code ERR_SLAVE_ALREADY_ENABLED = 0x0002;
+    const Error::Code ERR_INVALID_PERIPHERAL = 0x0001;
+    const Error::Code ERR_PERIPHERAL_ALREADY_ENABLED = 0x0002;
+    const Error::Code ERR_NOT_MASTER_MODE = 0x0003;
+    const Error::Code ERR_NOT_SLAVE_MODE = 0x0004;
     
     // Static values
     enum class Mode {
@@ -81,7 +84,7 @@ namespace SPI {
         MODE3 = 3  // CPOL=1, CPHA=1
     };
 
-    using Slave = uint8_t;
+    using Peripheral = uint8_t;
 
     enum class PinFunction {
         MOSI,
@@ -93,13 +96,22 @@ namespace SPI {
         CS3
     };
 
+    // Master-mode functions
+    void enableMaster();
+    bool addPeripheral(Peripheral peripheral, Mode mode=Mode::MODE0);
+    uint8_t transfer(Peripheral peripheral, uint8_t tx=0, bool next=false);
+    void transfer(Peripheral peripheral, uint8_t* txBuffer, int txBufferSize, uint8_t* rxBuffer=nullptr, int rxBufferSize=-1, bool partial=false);
 
-    // Module API
-    void enable();
+    // Slave-mode functions
+    void enableSlave(Mode mode=Mode::MODE0);
+    void slaveTransfer(uint8_t* txBuffer=nullptr, int txBufferSize=-1);
+    bool isSlaveTransferFinished();
+    int slaveGetReceivedData(uint8_t* rxBuffer, int rxBufferSize);
+    void enableSlaveTransferFinishedInterrupt(void (*handler)(int nReceivedBytes));
+    void disableSlaveTransferFinishedInterrupt();
+
+    // Common functions
     void disable();
-    bool enable(Slave slave, Mode mode=Mode::MODE0);
-    uint8_t transfer(Slave slave, uint8_t tx=0, bool next=false);
-    void transfer(Slave slave, uint8_t* txBuffer, uint8_t* rxBuffer, int size, int sizeRx=-1, bool partial=false);
     void setPin(PinFunction function, GPIO::Pin pin);
 
 }
