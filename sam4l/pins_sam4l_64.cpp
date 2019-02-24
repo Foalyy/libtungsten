@@ -68,10 +68,10 @@ namespace GLOC {
             {GPIO::Port::A,  7, GPIO::Periph::D}  // GLOC0 IN3
         },
         {
-            {GPIO::Port::A, 27, GPIO::Periph::D}, // GLOC1 IN4
-            {GPIO::Port::A, 28, GPIO::Periph::D}, // GLOC1 IN5
-            {GPIO::Port::A, 29, GPIO::Periph::D}, // GLOC1 IN6
-            {GPIO::Port::A, 30, GPIO::Periph::D}  // GLOC1 IN7
+            {GPIO::Port::A, 27, GPIO::Periph::D}, // GLOC1 IN0
+            {GPIO::Port::A, 28, GPIO::Periph::D}, // GLOC1 IN1
+            {GPIO::Port::A, 29, GPIO::Periph::D}, // GLOC1 IN2
+            {GPIO::Port::A, 30, GPIO::Periph::D}  // GLOC1 IN3
         }
     };
 
