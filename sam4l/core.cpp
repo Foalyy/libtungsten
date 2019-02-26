@@ -248,7 +248,7 @@ namespace Core {
 
             // Enable an alarm to wake up the chip after a specified
             // amount of time
-            AST::enableAlarm(length, true, nullptr);
+            AST::enableAlarm(length);
         }
 
         // Sleep until a known event happens
