@@ -154,7 +154,7 @@ namespace TC {
 
     const uint8_t N_TC = 1;
 
-    GPIO::Pin PINS[MAX_N_TC][N_CHANNELS * N_LINES] = {
+    GPIO::Pin PINS[MAX_N_TC][N_COUNTERS_PER_TC * N_CHANNELS_PER_COUNTER] = {
         {
             {GPIO::Port::A,  8, GPIO::Periph::B}, // TC0 A0
             {GPIO::Port::A,  9, GPIO::Periph::B}, // TC0 B0
@@ -165,7 +165,7 @@ namespace TC {
         }
     };
 
-    GPIO::Pin PINS_CLK[MAX_N_TC][N_CHANNELS * N_LINES] = {
+    GPIO::Pin PINS_CLK[MAX_N_TC][N_EXTERNAL_CLOCKS_PER_TC] = {
         {
             {GPIO::Port::A, 14, GPIO::Periph::B}, // TC0 CLK0
             {GPIO::Port::A, 15, GPIO::Periph::B}, // TC0 CLK1

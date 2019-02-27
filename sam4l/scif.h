@@ -181,7 +181,7 @@ namespace SCIF {
     unsigned long getRC810MFrequency();
 
     // Generic clocks
-    void enableGenericClock(GCLKChannel channel, GCLKSource source, bool output=true, uint32_t divider=0);
+    void enableGenericClock(GCLKChannel channel, GCLKSource source, bool output=false, uint32_t divider=0);
     void disableGenericClock(GCLKChannel channel);
 
     // Set the pins used for signal lines

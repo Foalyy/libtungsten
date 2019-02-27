@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "gpio.h"
+#include "error.h"
 
 // Serial Peripheral Interface
 // This module allows the chip to communicate through an SPI interface,
