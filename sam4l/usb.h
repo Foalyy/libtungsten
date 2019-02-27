@@ -126,9 +126,9 @@ namespace USB {
     const int EP_ADDR = 0;
     const int EP_PCKSIZE = 1;
     const int PCKSIZE_BYTE_COUNT = 0;
-    const int PCKSIZE_BYTE_COUNT_MASK = 0x007F;
+    const int PCKSIZE_BYTE_COUNT_MASK = 0x00007FFFF;
     const int PCKSIZE_MULTI_PACKET_SIZE = 16;
-    const int PCKSIZE_MULTI_PACKET_SIZE_MASK = 0x7F00;
+    const int PCKSIZE_MULTI_PACKET_SIZE_MASK = 0x7FFF0000;
     const int PCKSIZE_AUTO_ZLP = 31;
     const int EP_CTR_STA = 2;
     const int CTR_STA_STALLRQ_NEXT = 0;
@@ -263,20 +263,20 @@ namespace USB {
         SIZE16 = 0b001,
         SIZE32 = 0b010,
         SIZE64 = 0b011,
-        //SIZE128 = 0b100, // Unavailable for low- and full-speed
-        //SIZE256 = 0b101,
-        //SIZE512 = 0b110,
-        //SIZE1024 = 0b111
+        SIZE128 = 0b100, // /!\ EP sizes above 64 are only possible for
+        SIZE256 = 0b101, // isochronous transfers in low- and full-speed,
+        SIZE512 = 0b110, // according to the USB specification
+        SIZE1024 = 0b111
     };
     const int EP_SIZES[] = {
         8,
         16,
         32,
         64,
-        //128, // Unavailable for low- and full-speed
-        //256,
-        //512,
-        //1024
+        128,
+        256,
+        512,
+        1024
     };
     enum class EPDir {
         OUT = 0,
