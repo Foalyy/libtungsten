@@ -243,7 +243,7 @@ namespace USB {
     const int MAX_STRING_DESCRIPTOR_SIZE = 30;
     const char16_t DEFAULT_IMANUFACTURER[] = u"libtungsten";
     const char16_t DEFAULT_IPRODUCT[] = u"Carbide";
-    const char16_t DEFAULT_SERIALNUMBER[] = u"";
+    const char16_t DEFAULT_SERIALNUMBER[] = u"beta";
     extern String0Descriptor _string0Descriptor;
     extern StringDescriptor _stringDescriptors[];
 

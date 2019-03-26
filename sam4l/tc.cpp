@@ -107,6 +107,9 @@ namespace TC {
         (*(volatile uint32_t*)(TC_BASE + counter.tc * TC_SIZE + OFFSET_WPMR))
             = 1 << WPMR_WPEN            // WPEN : write protect enabled
             | UNLOCK_KEY << WPMR_WPKEY; // WPKEY : write protect key
+
+        // Start the counter
+        start(counter);
     }
 
 
@@ -165,6 +168,9 @@ namespace TC {
         if (output) {
             GPIO::enablePeripheral(PINS[channel.counter.tc][N_CHANNELS_PER_COUNTER * channel.counter.n + channel.line]);
         }
+
+        // Start the counter
+        start(channel.counter);
 
         return isValueValid;
     }
@@ -459,9 +465,12 @@ namespace TC {
     }
 
     // Wait for the specified delay
-    void wait(Counter counter, unsigned long delay, Unit unit) {
+    void wait(Counter counter, unsigned long delay, Unit unit, SourceClock sourceClock, unsigned long sourceClockFrequency) {
         checkTC(counter);
         uint32_t REG = TC_BASE + counter.tc * TC_SIZE + counter.n * OFFSET_COUNTER_SIZE;
+
+        // Initialize the counter and its clock
+        initCounter(counter, sourceClock, sourceClockFrequency);
 
         // Compute timing
         if (unit == Unit::MILLISECONDS) {
@@ -491,9 +500,12 @@ namespace TC {
     }
 
     // Call the given handler after the specified delay
-    void execDelayed(Counter counter, void (*handler)(), unsigned long delay, bool repeat, Unit unit) {
+    void execDelayed(Counter counter, void (*handler)(), unsigned long delay, bool repeat, Unit unit, SourceClock sourceClock, unsigned long sourceClockFrequency) {
         checkTC(counter);
         uint32_t REG = TC_BASE + counter.tc * TC_SIZE + counter.n * OFFSET_COUNTER_SIZE;
+
+        // Initialize the counter and its clock
+        initCounter(counter, sourceClock, sourceClockFrequency);
 
         // Stop the timer
         (*(volatile uint32_t*)(REG + OFFSET_CCR0)) = 1 << CCR_CLKDIS;

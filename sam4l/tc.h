@@ -208,8 +208,8 @@ namespace TC {
     unsigned long sourceClockFrequency(Counter counter);
 
     // Timing functions
-    void wait(Counter counter, unsigned long delay, Unit unit=Unit::MILLISECONDS);
-    void execDelayed(Counter counter, void (*handler)(), unsigned long delay, Unit unit=Unit::MILLISECONDS, bool repeat=false);
+    void wait(Counter counter, unsigned long delay, Unit unit=Unit::MILLISECONDS, SourceClock sourceClock=SourceClock::PBA_OVER_8, unsigned long sourceClockFrequency=0);
+    void execDelayed(Counter counter, void (*handler)(), unsigned long delay, Unit unit=Unit::MILLISECONDS, bool repeat=false, SourceClock sourceClock=SourceClock::PBA_OVER_8, unsigned long sourceClockFrequency=0);
 
     // Functions common to all modes
     void start(Counter counter);
