@@ -413,7 +413,9 @@ namespace USB {
                     // the endpoint size (UECFG.EPSIZE)
 
                     // Enable AUTO_ZLP
-                    //_epRAMDescriptors[i * EP_DESCRIPTOR_SIZE + EP_PCKSIZE] |= 1 << PCKSIZE_AUTO_ZLP;
+                    if (bytesToSend % EP_SIZES[static_cast<int>(_endpoints[i].size)] == 0) {
+                        _epRAMDescriptors[i * EP_DESCRIPTOR_SIZE + EP_PCKSIZE] |= 1 << PCKSIZE_AUTO_ZLP;
+                    }
 
                     // Clear interrupt (this will send the packet for a Control endpoint)
                     (*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR + i * 4))
@@ -641,7 +643,7 @@ namespace USB {
                     disableINInterrupt(0);
 
                     if (_lastSetupPacket.direction == EPDir::IN || _lastSetupPacket.wLength == 0) {
-                        int bytesToSend = _controlHandler(_lastSetupPacket, _bankEP0, _lastSetupPacket.wLength);
+                        int bytesToSend = _controlHandler(_lastSetupPacket, _bankEP0, min(_lastSetupPacket.wLength, BANK_EP0_SIZE));
                         return min(_lastSetupPacket.wLength, bytesToSend);
                     }
                     // For an OUT request, _lastSetupPacket.handled was set previously by ep0OUTHandler()
@@ -675,7 +677,7 @@ namespace USB {
             // This is an OUT packet containing data
             if (_controlHandler != nullptr) {
                 int size = _epRAMDescriptors[EP_N * EP_DESCRIPTOR_SIZE + EP_PCKSIZE] & PCKSIZE_BYTE_COUNT_MASK;
-                _controlHandler(_lastSetupPacket, _bankEP0, size);
+                _controlHandler(_lastSetupPacket, _bankEP0, min(size, BANK_EP0_SIZE));
             }
 
             // Enable the IN interrupt to ACK the received data

@@ -126,7 +126,7 @@ namespace USB {
     const int EP_ADDR = 0;
     const int EP_PCKSIZE = 1;
     const int PCKSIZE_BYTE_COUNT = 0;
-    const int PCKSIZE_BYTE_COUNT_MASK = 0x00007FFFF;
+    const int PCKSIZE_BYTE_COUNT_MASK = 0x00007FFF;
     const int PCKSIZE_MULTI_PACKET_SIZE = 16;
     const int PCKSIZE_MULTI_PACKET_SIZE_MASK = 0x7FFF0000;
     const int PCKSIZE_AUTO_ZLP = 31;
