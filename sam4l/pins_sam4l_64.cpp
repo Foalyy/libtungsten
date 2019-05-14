@@ -207,12 +207,12 @@ namespace TC {
     };
 
     // Alternatives
-    //{GPIO::Port::A,  8, GPIO::Periph::B}, // TC0 A0
-    //{GPIO::Port::A,  9, GPIO::Periph::B}, // TC0 B0
-    //{GPIO::Port::A, 10, GPIO::Periph::B}, // TC0 A1
-    //{GPIO::Port::A, 11, GPIO::Periph::B}, // TC0 B1
-    //{GPIO::Port::A, 12, GPIO::Periph::B}, // TC0 A2
-    //{GPIO::Port::A, 13, GPIO::Periph::B}, // TC0 B2
+    //{GPIO::Port::A,  8, GPIO::Periph::B}, // TC0 0A
+    //{GPIO::Port::A,  9, GPIO::Periph::B}, // TC0 0B
+    //{GPIO::Port::A, 10, GPIO::Periph::B}, // TC0 1A
+    //{GPIO::Port::A, 11, GPIO::Periph::B}, // TC0 1B
+    //{GPIO::Port::A, 12, GPIO::Periph::B}, // TC0 2A
+    //{GPIO::Port::A, 13, GPIO::Periph::B}, // TC0 2B
     //{GPIO::Port::A, 14, GPIO::Periph::B}, // TC0 CLK0
     //{GPIO::Port::A, 15, GPIO::Periph::B}, // TC0 CLK1
     //{GPIO::Port::A, 16, GPIO::Periph::B}, // TC0 CLK2

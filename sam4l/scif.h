@@ -91,6 +91,7 @@ namespace SCIF {
     // Error codes
     const uint16_t ERR_PLL_OUT_OF_RANGE = 0x0001;
     const uint16_t ERR_DFLL_OUT_OF_RANGE = 0x0002;
+    const uint16_t WARN_RCFAST_ALREADY_ENABLED = 0x0003;
 
     // RCFAST can be configured to operate in any of these frequencies
     enum class RCFASTFrequency {

@@ -14,6 +14,7 @@ namespace SCIF {
     unsigned long _pllFrequency = 0;
     unsigned long _dfllFrequency = 0;
     unsigned long _rcfastFrequency = 0;
+    RCFASTFrequency _rcfastFrequencySelected = RCFASTFrequency::RCFAST_4MHZ;
     unsigned long _rc80mFrequency = 80000000UL;
 
     // Output mask of the generic clocks
@@ -29,9 +30,16 @@ namespace SCIF {
     // RCFAST
 
     void enableRCFAST(RCFASTFrequency frequency) {
-        // If the RCFAST is already enabled, disable it first
+        // If RCFAST is already enabled
         if (_rcfastFrequency > 0) {
-            disableRCFAST();
+            // If the correct frequency is already selected, do nothing
+            if (frequency == _rcfastFrequencySelected) {
+                return;
+            } else {
+                // The current RCFAST setting will be overridden, issue a warning
+                Error::happened(Error::Module::SCIF, WARN_RCFAST_ALREADY_ENABLED, Error::Severity::WARNING);
+                disableRCFAST();
+            }
         }
 
         // Save the frequency for future use
@@ -51,6 +59,7 @@ namespace SCIF {
             default:
                 return;
         }
+        _rcfastFrequencySelected = frequency;
 
         // Unlock the RCFASTCFG register, which is locked by default as a safety mesure
         (*(volatile uint32_t*)(SCIF_BASE + OFFSET_UNLOCK))
