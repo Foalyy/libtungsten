@@ -51,19 +51,19 @@ namespace SPI {
         GPIO::disablePeripheral(PIN_MOSI);
         GPIO::disablePeripheral(PIN_SCK);
         if (_enabledPeripherals[0]) {
-            GPIO::enablePeripheral(PIN_NPCS0);
+            GPIO::disablePeripheral(PIN_NPCS0);
             _enabledPeripherals[0] = false;
         }
         if (_enabledPeripherals[1]) {
-            GPIO::enablePeripheral(PIN_NPCS1);
+            GPIO::disablePeripheral(PIN_NPCS1);
             _enabledPeripherals[1] = false;
         }
         if (_enabledPeripherals[2]) {
-            GPIO::enablePeripheral(PIN_NPCS2);
+            GPIO::disablePeripheral(PIN_NPCS2);
             _enabledPeripherals[2] = false;
         }
         if (_enabledPeripherals[3]) {
-            GPIO::enablePeripheral(PIN_NPCS3);
+            GPIO::disablePeripheral(PIN_NPCS3);
             _enabledPeripherals[3] = false;
         }
 
