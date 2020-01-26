@@ -9,6 +9,9 @@
 #include "error.h"
 #include <string.h>
 
+// Default exception vector defined in startup.cpp
+extern uint32_t exceptionVector[];
+
 namespace Core {
 
     // The ISR vector stores the pointers to the functions called when a fault or an interrupt is triggered.
@@ -28,6 +31,7 @@ namespace Core {
     void init() {
         // Initialize the ISR vector
         memset(_isrVector, 0, sizeof(_isrVector));
+        memcpy(_isrVector, exceptionVector, N_INTERNAL_EXCEPTIONS * sizeof(uint32_t));
 
         // Change the default handlers
         setExceptionHandler(Exception::NMI, handlerNMI);
