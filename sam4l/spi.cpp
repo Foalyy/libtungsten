@@ -261,7 +261,7 @@ namespace SPI {
         return (*(volatile uint32_t*)(SPI_BASE + OFFSET_RDR));
     }
 
-    void transfer(Peripheral peripheral, uint8_t* txBuffer, int txBufferSize, uint8_t* rxBuffer, int rxBufferSize, bool partial) {
+    void transfer(Peripheral peripheral, const uint8_t* txBuffer, int txBufferSize, uint8_t* rxBuffer, int rxBufferSize, bool partial) {
         // Make sure the controller is enabled in master mode
         if (!_enabled || !_modeMaster) {
             Error::happened(Error::Module::SPI, ERR_NOT_MASTER_MODE, Error::Severity::CRITICAL);
@@ -430,7 +430,7 @@ namespace SPI {
             | 0b0000 << CSR_BITS;    // BITS : 8 bits per transfer
     }
 
-    void slaveTransfer(uint8_t* txBuffer, int txBufferSize) {
+    void slaveTransfer(const uint8_t* txBuffer, int txBufferSize) {
         // Make sure the controller is enabled in slave mode
         if (!_enabled || _modeMaster) {
             Error::happened(Error::Module::SPI, ERR_NOT_SLAVE_MODE, Error::Severity::CRITICAL);

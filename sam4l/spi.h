@@ -101,11 +101,11 @@ namespace SPI {
     void enableMaster();
     bool addPeripheral(Peripheral peripheral, Mode mode=Mode::MODE0);
     uint8_t transfer(Peripheral peripheral, uint8_t tx=0, bool next=false);
-    void transfer(Peripheral peripheral, uint8_t* txBuffer, int txBufferSize, uint8_t* rxBuffer=nullptr, int rxBufferSize=-1, bool partial=false);
+    void transfer(Peripheral peripheral, const uint8_t* txBuffer, int txBufferSize, uint8_t* rxBuffer=nullptr, int rxBufferSize=-1, bool partial=false);
 
     // Slave-mode functions
     void enableSlave(Mode mode=Mode::MODE0);
-    void slaveTransfer(uint8_t* txBuffer=nullptr, int txBufferSize=-1);
+    void slaveTransfer(const uint8_t* txBuffer=nullptr, int txBufferSize=-1);
     bool isSlaveTransferFinished();
     int slaveGetReceivedData(uint8_t* rxBuffer, int rxBufferSize);
     void enableSlaveTransferFinishedInterrupt(void (*handler)(int nReceivedBytes));
