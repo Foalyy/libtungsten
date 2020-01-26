@@ -97,6 +97,7 @@ namespace Carbide {
                 break;
 
             case CPUFreq::FREQ_36MHZ:
+                BPM::setPowerScaling(BPM::PowerScaling::PS2);
                 SCIF::enableDFLL(36000000UL);
                 PM::setMainClockSource(PM::MainClockSource::DFLL);
                 break;
