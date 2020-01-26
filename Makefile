@@ -1,4 +1,7 @@
 # Default config
+ifndef NAME
+	NAME=main
+endif
 ifndef ROOTDIR
 	ROOTDIR=.
 endif
@@ -52,6 +55,7 @@ endif
 
 # Toolchain
 CXX=$(TOOLCHAIN_PATH)arm-none-eabi-g++
+CC=$(TOOLCHAIN_PATH)arm-none-eabi-gcc
 OBJCOPY=$(TOOLCHAIN_PATH)arm-none-eabi-objcopy
 GDB=$(TOOLCHAIN_PATH)arm-none-eabi-gdb
 SIZE=$(TOOLCHAIN_PATH)arm-none-eabi-size
@@ -83,12 +87,20 @@ ifeq ($(strip $(DEBUG)), true)
 else
 	OPTFLAGS=-Os -ffunction-sections -fdata-sections
 endif
-CXXFLAGS=$(ARCH_FLAGS) $(STARTUP_DEFS) \
+CXXFLAGS=$(ARCH_FLAGS) \
 	-I$(ROOTDIR)/$(LIBNAME) \
 	-I$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) \
 	-I$(ROOTDIR)/$(LIBNAME)/utils \
 	-I$(ROOTDIR)/$(LIBNAME)/carbide \
+	$(INCLUDE) \
 	-std=c++11 -Wall $(OPTFLAGS) $(PREPROC_DEFINES) $(ADD_CXXFLAGS)
+CFLAGS=$(ARCH_FLAGS) \
+	-I$(ROOTDIR)/$(LIBNAME) \
+	-I$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) \
+	-I$(ROOTDIR)/$(LIBNAME)/utils \
+	-I$(ROOTDIR)/$(LIBNAME)/carbide \
+	$(INCLUDE) \
+	-std=c99 -Wall $(OPTFLAGS) $(PREPROC_DEFINES) $(ADD_CFLAGS)
 
 # Linking flags
 ifndef LD_SCRIPT_NAME
@@ -161,6 +173,9 @@ $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.o: $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%
 # Compile other modules
 %.o: %.cpp %.h
 	$(CXX) $(CXXFLAGS) $(LFLAGS) -c $< -o $@
+
+%.o: %.c
+	$(CC) $(CFLAGS) $(LFLAGS) -c $< -o $@
 
 # Start OpenOCD, which is used to reset/flash the chip and as a remote target for GDB
 openocd:
