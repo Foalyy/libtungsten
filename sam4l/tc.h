@@ -179,6 +179,8 @@ namespace TC {
 
     // Simple counter mode
     void enableSimpleCounter(Counter counter, uint32_t maxValue=0xFFFF, SourceClock sourceClock=SourceClock::PBA_OVER_8, unsigned long sourceClockFrequency=0, bool invertClock=false, bool upDown=false);
+    void enableSimpleCounterFullInterrupt(Counter counter, void (*handler)(Counter)=nullptr);
+    void disableSimpleCounterFullInterrupt(Counter counter);
 
     // PWM mode
     bool enablePWM(Channel channel, float period=0, float highTime=0, bool output=true, SourceClock sourceClock=SourceClock::PBA_OVER_8, unsigned long sourceClockFrequency=0);

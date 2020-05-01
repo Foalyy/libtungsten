@@ -39,6 +39,7 @@ namespace TC {
     // Simple counter mode
     uint32_t _counterModeMaxValue[MAX_N_TC][N_COUNTERS_PER_TC];
     uint16_t _counterModeMSB[MAX_N_TC][N_COUNTERS_PER_TC];
+    void (*_counterModeFullHandler[MAX_N_TC][N_COUNTERS_PER_TC])(Counter counter);
     void simpleCounterOverflowHandler(Counter counter);
     void simpleCounterRCCompareHandler(Counter counter);
 
@@ -90,6 +91,7 @@ namespace TC {
             memset(_rcCompareHandler, 0, sizeof(_rcCompareHandler));
             memset(_rcCompareHandlerEnabled, 0, sizeof(_rcCompareHandlerEnabled));
             memset(_rcCompareInternalHandler, 0, sizeof(_rcCompareInternalHandler));
+            memset(_counterModeFullHandler, 0, sizeof(_counterModeFullHandler));
             memset(_periodMSB, 0, sizeof(_periodMSB));
             memset(_highTimeMSB, 0, sizeof(_highTimeMSB));
             memset(_periodMSBInternal, 0, sizeof(_periodMSB));
@@ -159,6 +161,7 @@ namespace TC {
         memset(_rcCompareHandler, 0, sizeof(_rcCompareHandler));
         memset(_rcCompareHandlerEnabled, 0, sizeof(_rcCompareHandlerEnabled));
         memset(_rcCompareInternalHandler, 0, sizeof(_rcCompareInternalHandler));
+        memset(_counterModeFullHandler, 0, sizeof(_counterModeFullHandler));
 
         // Disable the output pins
         for (int i = 0; i < N_CHANNELS_PER_COUNTER; i++) {
@@ -249,6 +252,35 @@ namespace TC {
         start(counter);
     }
 
+    // Register an interrupt to be called when the max value of the counter has been reached
+    void enableSimpleCounterFullInterrupt(Counter counter, void (*handler)(Counter)) {
+        checkTC(counter);
+        uint32_t REG = TC_BASE + counter.tc * TC_SIZE + counter.n * OFFSET_COUNTER_SIZE;
+
+        // Save the handler
+        _counterModeFullHandler[counter.tc][counter.n] = handler;
+
+        // If maxValue > 0xFFFF, interrupts are already handled by the 32-bit counter mode and
+        // the RC Compare interrupt will be enabled as needed by simpleCounterOverflowHandler()
+        if (_counterModeMaxValue[counter.tc][counter.n] <= 0xFFFF) {
+            // Enable the interrupts in this counter
+            enableInterrupt(counter);
+
+            // Enable the RC Compare interrupt
+            _rcCompareInternalHandler[counter.tc][counter.n] = simpleCounterRCCompareHandler;
+            (*(volatile uint32_t*)(REG + OFFSET_IER0))
+                = 1 << SR_CPCS;    // SR_CPCS : RC compare status
+        }
+    }
+
+    // Disable the Counter Full interrupt
+    void disableSimpleCounterFullInterrupt(Counter counter) {
+        checkTC(counter);
+
+        // Remove the handler
+        _counterModeFullHandler[counter.tc][counter.n] = nullptr;
+    }
+
     // Internal handler to handle 32-bit mode
     void simpleCounterOverflowHandler(Counter counter) {
         uint32_t REG = TC_BASE + counter.tc * TC_SIZE + counter.n * OFFSET_COUNTER_SIZE;
@@ -290,35 +322,43 @@ namespace TC {
     void simpleCounterRCCompareHandler(Counter counter) {
         uint32_t REG = TC_BASE + counter.tc * TC_SIZE + counter.n * OFFSET_COUNTER_SIZE;
 
-        // Counter has reached its max value, reset the MSB of the counter
-        _counterModeMSB[counter.tc][counter.n] = 0;
+        // 32-bit mode
+        if (_counterModeMaxValue[counter.tc][counter.n] > 0xFFFF) {
+            // Counter has reached its max value, reset the MSB of the counter
+            _counterModeMSB[counter.tc][counter.n] = 0;
 
-        // Disable RC compare interrupt
-        _rcCompareInternalHandler[counter.tc][counter.n] = nullptr;
-        if (!_rcCompareHandlerEnabled[counter.tc][counter.n]) {
-            // IDR (Interrupt Disable Register) : disable the interrupt
-            (*(volatile uint32_t*)(REG + OFFSET_IDR0))
-                = 1 << SR_CPCS;    // SR_CPCS : RC compare status
+            // Disable RC compare interrupt
+            _rcCompareInternalHandler[counter.tc][counter.n] = nullptr;
+            if (!_rcCompareHandlerEnabled[counter.tc][counter.n]) {
+                // IDR (Interrupt Disable Register) : disable the interrupt
+                (*(volatile uint32_t*)(REG + OFFSET_IDR0))
+                    = 1 << SR_CPCS;    // SR_CPCS : RC compare status
+            }
+
+            // Enable the Counter Overflow interrupt
+            _counterOverflowInternalHandler[counter.tc][counter.n] = simpleCounterOverflowHandler;
+            enableInterrupt(counter);
+            (*(volatile uint32_t*)(REG + OFFSET_IER0))
+                = 1 << SR_COVFS;    // SR_COVFS : counter overflow status
+
+            // WPMR (Write Protect Mode Register) : disable write protect
+            (*(volatile uint32_t*)(TC_BASE + counter.tc * TC_SIZE + OFFSET_WPMR))
+                = 0 << WPMR_WPEN            // WPEN : write protect disabled
+                | UNLOCK_KEY << WPMR_WPKEY; // WPKEY : write protect key
+
+            // CMR (Channel Mode Register) : disable automatic trigger on RC compare
+            (*(volatile uint32_t*)(REG + OFFSET_CMR0)) &= ~(uint32_t)(0b11 << CMR_WAVSEL);
+
+            // WPMR (Write Protect Mode Register) : re-enable write protect
+            (*(volatile uint32_t*)(TC_BASE + counter.tc * TC_SIZE + OFFSET_WPMR))
+                = 1 << WPMR_WPEN            // WPEN : write protect enabled
+                | UNLOCK_KEY << WPMR_WPKEY; // WPKEY : write protect key
         }
 
-        // Enable the Counter Overflow interrupt
-        _counterOverflowInternalHandler[counter.tc][counter.n] = simpleCounterOverflowHandler;
-        enableInterrupt(counter);
-        (*(volatile uint32_t*)(REG + OFFSET_IER0))
-            = 1 << SR_COVFS;    // SR_COVFS : counter overflow status
-
-        // WPMR (Write Protect Mode Register) : disable write protect
-        (*(volatile uint32_t*)(TC_BASE + counter.tc * TC_SIZE + OFFSET_WPMR))
-            = 0 << WPMR_WPEN            // WPEN : write protect disabled
-            | UNLOCK_KEY << WPMR_WPKEY; // WPKEY : write protect key
-
-        // CMR (Channel Mode Register) : disable automatic trigger on RC compare
-        (*(volatile uint32_t*)(REG + OFFSET_CMR0)) &= ~(uint32_t)(0b11 << CMR_WAVSEL);
-
-        // WPMR (Write Protect Mode Register) : re-enable write protect
-        (*(volatile uint32_t*)(TC_BASE + counter.tc * TC_SIZE + OFFSET_WPMR))
-            = 1 << WPMR_WPEN            // WPEN : write protect enabled
-            | UNLOCK_KEY << WPMR_WPKEY; // WPKEY : write protect key
+        // If the Counter Full interrupt has been enabled by the user, call the registered handler
+        if (_counterModeFullHandler[counter.tc][counter.n] != nullptr) {
+            _counterModeFullHandler[counter.tc][counter.n](counter);
+        }
     }
 
 
