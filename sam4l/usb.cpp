@@ -181,10 +181,15 @@ namespace USB {
         Core::enableInterrupt(Core::Interrupt::USBC, INTERRUPT_PRIORITY);
     }
 
+    // Set the content of a custom string descriptor
     void setStringDescriptor(StringDescriptors descriptor, const char* string, int size) {
+        // Check the input string size
         if (size > MAX_STRING_DESCRIPTOR_SIZE) {
             size = MAX_STRING_DESCRIPTOR_SIZE;
         }
+
+        // Since the input string is a char* but the USB protocol expects a char16*, we need to
+        // copy each character manually
         char16_t* customString = _customStringDescriptors[static_cast<int>(descriptor)];
         for (int i = 0; i < size; i++) {
             if (string[i] == 0) {
@@ -193,6 +198,8 @@ namespace USB {
             }
             customString[i] = string[i];
         }
+
+        // The descriptor is also twice as long as the input string
         _stringDescriptors[static_cast<int>(descriptor)].bLength = 2 * size + 2;
         _stringDescriptors[static_cast<int>(descriptor)].bString = customString;
     }
@@ -693,6 +700,19 @@ namespace USB {
         if (ep->enabled) {
             ep->handlers[static_cast<int>(handlerType)] = handler;
         }
+    }
+
+    // Mark the endpoint as busy : all requests will be NACKed until setEndpointReady() is called
+    // on this endpoint
+    void setEndpointBusy(Endpoint endpointNumber) {
+        (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0SET + endpointNumber * 4))
+            = 1 << UECON_BUSY0E;
+    }
+
+    // Mark the endpoint as ready to receive data again, after a call to setEndpointBusy()
+    void setEndpointReady(Endpoint endpointNumber) {
+        (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0CLR + endpointNumber * 4))
+            = 1 << UECON_BUSY0E;
     }
 
     // Enable the IN interrupt on the specified endpoint

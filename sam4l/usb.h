@@ -350,6 +350,8 @@ namespace USB {
     void setStartOfFrameHandler(void (*handler)());
     void setControlHandler(int (*handler)(SetupPacket &_lastSetupPacket, uint8_t* data, int size));
     void setEndpointHandler(Endpoint endpointNumber, EPHandlerType handlerType, int (*handler)(int));
+    void setEndpointBusy(Endpoint endpointNumber=0);
+    void setEndpointReady(Endpoint endpointNumber=0);
     void enableINInterrupt(Endpoint endpointNumber);
     void abortINTransfer(Endpoint endpointNumber);
     void disableINInterrupt(Endpoint endpointNumber);
