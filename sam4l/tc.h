@@ -178,7 +178,7 @@ namespace TC {
 
 
     // Simple counter mode
-    void enableSimpleCounter(Counter counter, uint16_t maxValue=0xFFFF, SourceClock sourceClock=SourceClock::PBA_OVER_8, unsigned long sourceClockFrequency=0, bool invertClock=false, bool upDown=false);
+    void enableSimpleCounter(Counter counter, uint32_t maxValue=0xFFFF, SourceClock sourceClock=SourceClock::PBA_OVER_8, unsigned long sourceClockFrequency=0, bool invertClock=false, bool upDown=false);
 
     // PWM mode
     bool enablePWM(Channel channel, float period=0, float highTime=0, bool output=true, SourceClock sourceClock=SourceClock::PBA_OVER_8, unsigned long sourceClockFrequency=0);
@@ -189,19 +189,23 @@ namespace TC {
     void disableOutput(Channel channel);
 
     // Measure mode
-    void enableMeasure(Counter counter, SourceClock sourceClock=SourceClock::PBA_OVER_8, unsigned long sourceClockFrequency=0);
+    void enableMeasurement(Counter counter, SourceClock sourceClock=SourceClock::PBA_OVER_8, unsigned long sourceClockFrequency=0);
     void measure(Counter counter, bool continuous=false);
-    uint16_t measuredPeriodRaw(Counter counter);
+    uint32_t measuredPeriodRaw(Counter counter);
     unsigned long measuredPeriod(Counter counter);
-    uint16_t measuredHighTimeRaw(Counter counter);
+    uint32_t measuredHighTimeRaw(Counter counter);
     unsigned long measuredHighTime(Counter counter);
     unsigned int measuredDutyCycle(Counter counter);
     bool isMeasureOverflow(Counter counter);
 
+    // Interrupts
+    void enableCounterOverflowInterrupt(Counter counter, void (*handler)(Counter)=nullptr);
+    void disableCounterOverflowInterrupt(Counter counter);
+
     // Low-level counter functions
     bool setRX(Channel channel, unsigned int rx);
     bool setRC(Counter counter, unsigned int rc);
-    uint16_t counterValue(Counter counter);
+    uint32_t counterValue(Counter counter);
     uint16_t raValue(Counter counter);
     uint16_t rbValue(Counter counter);
     uint16_t rcValue(Counter counter);
@@ -215,6 +219,7 @@ namespace TC {
     void start(Counter counter);
     void stop(Counter counter);
     void sync();
+    void disable(Counter counter);
     void setPin(Channel channel, PinFunction function, GPIO::Pin pin);
 
 }

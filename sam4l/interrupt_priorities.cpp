@@ -47,7 +47,7 @@ namespace SPI {
 }
 
 namespace TC {
-    uint8_t INTERRUPT_PRIORITY = 40;
+    uint8_t INTERRUPT_PRIORITY = 6;
 }
 
 namespace TRNG {
