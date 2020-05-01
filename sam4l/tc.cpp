@@ -40,6 +40,7 @@ namespace TC {
     uint32_t _counterModeMaxValue[MAX_N_TC][N_COUNTERS_PER_TC];
     uint16_t _counterModeMSB[MAX_N_TC][N_COUNTERS_PER_TC];
     void (*_counterModeFullHandler[MAX_N_TC][N_COUNTERS_PER_TC])(Counter counter);
+    bool _counterModeFullHandlerEnabled[MAX_N_TC][N_COUNTERS_PER_TC];
     void simpleCounterOverflowHandler(Counter counter);
     void simpleCounterRCCompareHandler(Counter counter);
 
@@ -92,6 +93,7 @@ namespace TC {
             memset(_rcCompareHandlerEnabled, 0, sizeof(_rcCompareHandlerEnabled));
             memset(_rcCompareInternalHandler, 0, sizeof(_rcCompareInternalHandler));
             memset(_counterModeFullHandler, 0, sizeof(_counterModeFullHandler));
+            memset(_counterModeFullHandlerEnabled, 0, sizeof(_counterModeFullHandlerEnabled));
             memset(_periodMSB, 0, sizeof(_periodMSB));
             memset(_highTimeMSB, 0, sizeof(_highTimeMSB));
             memset(_periodMSBInternal, 0, sizeof(_periodMSB));
@@ -162,6 +164,7 @@ namespace TC {
         memset(_rcCompareHandlerEnabled, 0, sizeof(_rcCompareHandlerEnabled));
         memset(_rcCompareInternalHandler, 0, sizeof(_rcCompareInternalHandler));
         memset(_counterModeFullHandler, 0, sizeof(_counterModeFullHandler));
+        memset(_counterModeFullHandlerEnabled, 0, sizeof(_counterModeFullHandlerEnabled));
 
         // Disable the output pins
         for (int i = 0; i < N_CHANNELS_PER_COUNTER; i++) {
@@ -257,8 +260,11 @@ namespace TC {
         checkTC(counter);
         uint32_t REG = TC_BASE + counter.tc * TC_SIZE + counter.n * OFFSET_COUNTER_SIZE;
 
-        // Save the handler
-        _counterModeFullHandler[counter.tc][counter.n] = handler;
+        // Save the handler and mark it as enabled
+        if (handler != nullptr) {
+            _counterModeFullHandler[counter.tc][counter.n] = handler;
+        }
+        _counterModeFullHandlerEnabled[counter.tc][counter.n] = true;
 
         // If maxValue > 0xFFFF, interrupts are already handled by the 32-bit counter mode and
         // the RC Compare interrupt will be enabled as needed by simpleCounterOverflowHandler()
@@ -276,9 +282,17 @@ namespace TC {
     // Disable the Counter Full interrupt
     void disableSimpleCounterFullInterrupt(Counter counter) {
         checkTC(counter);
+        uint32_t REG = TC_BASE + counter.tc * TC_SIZE + counter.n * OFFSET_COUNTER_SIZE;
 
-        // Remove the handler
-        _counterModeFullHandler[counter.tc][counter.n] = nullptr;
+        // Disable the handler
+        _counterModeFullHandlerEnabled[counter.tc][counter.n] = false;
+
+        // Make sure the interrupt is not used internally before disabling it
+        if (_rcCompareInternalHandler[counter.tc][counter.n] == nullptr) {
+            // IDR (Interrupt Disable Register) : disable the interrupt
+            (*(volatile uint32_t*)(REG + OFFSET_IDR0))
+                = 1 << SR_CPCS;    // SR_CPCS : RC compare status
+        }
     }
 
     // Internal handler to handle 32-bit mode
@@ -356,7 +370,7 @@ namespace TC {
         }
 
         // If the Counter Full interrupt has been enabled by the user, call the registered handler
-        if (_counterModeFullHandler[counter.tc][counter.n] != nullptr) {
+        if (_counterModeFullHandler[counter.tc][counter.n] != nullptr && _counterModeFullHandlerEnabled[counter.tc][counter.n]) {
             _counterModeFullHandler[counter.tc][counter.n](counter);
         }
     }
@@ -678,7 +692,9 @@ namespace TC {
         uint32_t REG = TC_BASE + counter.tc * TC_SIZE + counter.n * OFFSET_COUNTER_SIZE;
 
         // Save the user handler and mark it as enabled
-        _counterOverflowHandler[counter.tc][counter.n] = handler;
+        if (handler != nullptr) {
+            _counterOverflowHandler[counter.tc][counter.n] = handler;
+        }
         _counterOverflowHandlerEnabled[counter.tc][counter.n] = true;
 
         // Enable the interrupts in this counter
