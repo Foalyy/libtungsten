@@ -77,13 +77,13 @@ namespace I2C {
         // Enable the clock
         PM::enablePeripheralClock(PM_CLK_M[static_cast<int>(port)]);
 
-        // CR (Control Register) : reset the interface
-        (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
-            = 1 << M_CR_SWRST;        // SWRST : software reset
-
         // CR (Control Register) : enable the master interface
         (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
             = 1 << M_CR_MEN;          // MEN : Master Enable
+
+        // CR (Control Register) : reset the interface
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
+            = 1 << M_CR_SWRST;        // SWRST : software reset
 
         // CWGR (Clock Waveform Generator Register) : setup the SCL (clock) line
         _frequency = frequency;
@@ -154,6 +154,13 @@ namespace I2C {
             return false;
         }
 
+        // CR (Control Register) : reset the interface in case a failed previous
+        // transfer is still pending
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
+            = 1 << M_CR_SWRST;
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
+            = 1 << M_CR_MEN;
+
         // CMDR (Command Register) : initiate a transfer
         (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CMDR))
             = !static_cast<int>(direction) << M_CMDR_READ
@@ -192,7 +199,7 @@ namespace I2C {
     }
 
     // Master read
-    int read(Port port, uint8_t address, uint8_t* buffer, int n) {
+    unsigned int read(Port port, uint8_t address, uint8_t* buffer, int n, bool* acked) {
         struct Channel* p = &(ports[static_cast<int>(port)]);
         if (p->mode != Mode::MASTER) {
             Error::happened(Error::Module::I2C, ERR_PORT_NOT_INITIALIZED, Error::Severity::CRITICAL);
@@ -202,6 +209,13 @@ namespace I2C {
         if (checkArbitrationLost(port)) {
             return 0;
         }
+
+        // CR (Control Register) : reset the interface in case a failed previous
+        // transfer is still pending
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
+            = 1 << M_CR_SWRST;
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
+            = 1 << M_CR_MEN;
 
         // Clear every status
         (*(volatile uint32_t*)(REG_BASE + OFFSET_M_SCR)) = 0xFFFFFFFF;
@@ -237,16 +251,23 @@ namespace I2C {
         if ((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & 1 << M_SR_ANAK) {
             (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CMDR)) = 0;
             (*(volatile uint32_t*)(REG_BASE + OFFSET_M_SCR)) = 1 << M_SR_ANAK;
+            if (acked != nullptr) {
+                *acked = false;
+            }
             return 0;
+        } else {
+            if (acked != nullptr) {
+                *acked = true;
+            }
         }
 
         return n - DMA::getCounter(p->rxDMAChannel);
     }
 
     // Helper function to read a single byte
-    uint8_t read(Port port, uint8_t address) {
+    unsigned int read(Port port, uint8_t address, bool* acked) {
         uint8_t buffer[] = {0x00};
-        read(port, address, buffer, 1);
+        read(port, address, buffer, 1, acked);
         return buffer[0];
     }
 
@@ -261,6 +282,13 @@ namespace I2C {
         if (checkArbitrationLost(port)) {
             return false;
         }
+
+        // CR (Control Register) : reset the interface in case a failed previous
+        // transfer is still pending
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
+            = 1 << M_CR_SWRST;
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
+            = 1 << M_CR_MEN;
 
         // Write at most BUFFER_SIZE characters
         if (n > BUFFER_SIZE) {
@@ -283,14 +311,19 @@ namespace I2C {
             DMA::startChannel(p->txDMAChannel, (uint32_t)(p->buffer + 1), n - 1);
         }
 
-        // CMDR (Command Register) : initiate a write transfer
-        (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CMDR))
+        // CMDR (Command Register) : configure the command to send
+        uint32_t cmdr
             = 0 << M_CMDR_READ
             | address << M_CMDR_SADR
             | 1 << M_CMDR_START
             | 1 << M_CMDR_STOP
-            | 1 << M_CMDR_VALID
             | n << M_CMDR_NBYTES;
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CMDR)) = cmdr;
+
+        // CMDR (Command Register) : execute the command
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CMDR))
+            = cmdr
+            | 1 << M_CMDR_VALID;
 
         // Wait for the transfer to be finished
         if (n >= 2) {
@@ -330,7 +363,7 @@ namespace I2C {
     // Write then immediately read on the bus on the same transfer, with a Repeated Start condition.
     // This is especially useful for reading registers on devices by writing the register address
     // then reading the value
-    bool writeRead(Port port, uint8_t address, const uint8_t* txBuffer, int nTX, uint8_t* rxBuffer, int nRX) {
+    unsigned int writeRead(Port port, uint8_t address, const uint8_t* txBuffer, int nTX, uint8_t* rxBuffer, int nRX, bool* acked) {
         struct Channel* p = &(ports[static_cast<int>(port)]);
         if (p->mode != Mode::MASTER) {
             Error::happened(Error::Module::I2C, ERR_PORT_NOT_INITIALIZED, Error::Severity::CRITICAL);
@@ -340,6 +373,13 @@ namespace I2C {
         if (checkArbitrationLost(port)) {
             return false;
         }
+
+        // CR (Control Register) : reset the interface in case a failed previous
+        // transfer is still pending
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
+            = 1 << M_CR_SWRST;
+        (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CR))
+            = 1 << M_CR_MEN;
 
         // Write at most BUFFER_SIZE characters
         if (nTX >  BUFFER_SIZE) {
@@ -402,15 +442,22 @@ namespace I2C {
         if ((*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR)) & 1 << M_SR_ANAK) {
             (*(volatile uint32_t*)(REG_BASE + OFFSET_M_CMDR)) = 0;
             (*(volatile uint32_t*)(REG_BASE + OFFSET_M_SCR)) = 1 << M_SR_ANAK;
+            if (acked != nullptr) {
+                *acked = false;
+            }
             return 0;
+        } else {
+            if (acked != nullptr) {
+                *acked = true;
+            }
         }
 
         return nRX - DMA::getCounter(p->rxDMAChannel);
     }
 
     // Helper function which writes a single byte then reads the result
-    bool writeRead(Port port, uint8_t address, uint8_t byte, uint8_t* rxBuffer, int nRX) {
-        return writeRead(port, address, &byte, 1, rxBuffer, nRX);
+    unsigned int writeRead(Port port, uint8_t address, uint8_t byte, uint8_t* rxBuffer, int nRX, bool* acked) {
+        return writeRead(port, address, &byte, 1, rxBuffer, nRX, acked);
     }
 
 
