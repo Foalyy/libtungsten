@@ -265,7 +265,7 @@ namespace I2C {
     }
 
     // Helper function to read a single byte
-    unsigned int read(Port port, uint8_t address, bool* acked) {
+    uint8_t read(Port port, uint8_t address, bool* acked) {
         uint8_t buffer[] = {0x00};
         read(port, address, buffer, 1, acked);
         return buffer[0];

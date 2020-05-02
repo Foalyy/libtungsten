@@ -183,7 +183,7 @@ namespace I2C {
     // Master-mode functions
     bool enableMaster(Port port, unsigned int frequency=100000);
     unsigned int read(Port port, uint8_t address, uint8_t* buffer, int n, bool* acked=nullptr);
-    unsigned int read(Port port, uint8_t address, bool* acked=nullptr);
+    uint8_t read(Port port, uint8_t address, bool* acked=nullptr);
     bool write(Port port, uint8_t address, const uint8_t* buffer, int n);
     bool write(Port port, uint8_t address, uint8_t byte);
     unsigned int writeRead(Port port, uint8_t address, const uint8_t* txBuffer, int nTX, uint8_t* rxBuffer, int nRX, bool* acked=nullptr);
