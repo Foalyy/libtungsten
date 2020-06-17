@@ -396,9 +396,6 @@ namespace TC {
             = 1 << CCR_CLKDIS;       // CLKDIS : disable the clock
 
         // CMR (Channel Mode Register) : setup the counter in Waveform Generation Mode
-        (*(volatile uint32_t*)(REG + OFFSET_CMR0))
-            =                   // TCCLKS : clock selection
-              (static_cast<int>(sourceClock) & 0b111) << CMR_TCCLKS
         uint32_t cmr = (*(volatile uint32_t*)(REG + OFFSET_CMR0)) & 0xFFFF0000; // Keep the current config of the A and B lines
         cmr = cmr
             | (static_cast<int>(sourceClock) & 0b111) << CMR_TCCLKS // TCCLKS : clock selection
@@ -408,13 +405,6 @@ namespace TC {
             | 0 << CMR_CPCDIS   // CPCDIS : clock is not disabled with RC compare
             | 1 << CMR_EEVT     // EEVT : external event selection to XC0 (TIOB is therefore an output)
             | 2 << CMR_WAVSEL   // WAVSEL : UP mode with automatic trigger on RC Compare
-            | 1 << CMR_WAVE     // WAVE : waveform generation mode
-            | 2 << CMR_ACPA     // ACPA : RA/TIOA : clear
-            | 1 << CMR_ACPC     // ACPC : RC/TIOA : set
-            | 1 << CMR_ASWTRG   // ASWTRG : SoftwareTrigger/TIOA : set
-            | 2 << CMR_BCPB     // BCPA : RA/TIOB : clear
-            | 1 << CMR_BCPC     // BCPC : RC/TIOB : set
-            | 1 << CMR_BSWTRG;  // BSWTRG : SoftwareTrigger/TIOB : set
             | 1 << CMR_WAVE;     // WAVE : waveform generation mode
         if (channel.line == TIOA) {
             cmr &= 0xFF00FFFF;       // Erase current config for channel A
