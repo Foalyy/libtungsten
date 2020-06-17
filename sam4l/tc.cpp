@@ -399,6 +399,9 @@ namespace TC {
         (*(volatile uint32_t*)(REG + OFFSET_CMR0))
             =                   // TCCLKS : clock selection
               (static_cast<int>(sourceClock) & 0b111) << CMR_TCCLKS
+        uint32_t cmr = (*(volatile uint32_t*)(REG + OFFSET_CMR0)) & 0xFFFF0000; // Keep the current config of the A and B lines
+        cmr = cmr
+            | (static_cast<int>(sourceClock) & 0b111) << CMR_TCCLKS // TCCLKS : clock selection
             | 0 << CMR_CLKI     // CLKI : disable clock invert
             | 0 << CMR_BURST    // BURST : disable burst mode
             | 0 << CMR_CPCSTOP  // CPCSTOP : clock is not stopped with RC compare
@@ -412,6 +415,19 @@ namespace TC {
             | 2 << CMR_BCPB     // BCPA : RA/TIOB : clear
             | 1 << CMR_BCPC     // BCPC : RC/TIOB : set
             | 1 << CMR_BSWTRG;  // BSWTRG : SoftwareTrigger/TIOB : set
+            | 1 << CMR_WAVE;     // WAVE : waveform generation mode
+        if (channel.line == TIOA) {
+            cmr &= 0xFF00FFFF;       // Erase current config for channel A
+            cmr |= 2 << CMR_ACPA     // ACPA : RA/TIOA : clear
+                |  1 << CMR_ACPC     // ACPC : RC/TIOA : set
+                |  2 << CMR_ASWTRG;  // ASWTRG : SoftwareTrigger/TIOA : clear
+        } else { // TIOB
+            cmr &= 0x00FFFFFF;       // Erase current config for channel B
+            cmr |= 2 << CMR_BCPB     // BCPA : RA/TIOB : clear
+                |  1 << CMR_BCPC     // BCPC : RC/TIOB : set
+                |  2 << CMR_BSWTRG;  // BSWTRG : SoftwareTrigger/TIOB : clear
+        }
+        (*(volatile uint32_t*)(REG + OFFSET_CMR0)) = cmr;
 
         // Set the period and high time
         bool isValueValid = true;
@@ -427,14 +443,14 @@ namespace TC {
             = 1 << WPMR_WPEN            // WPEN : write protect enabled
             | UNLOCK_KEY << WPMR_WPKEY; // WPKEY : write protect key
 
+        // Start the counter
+        start(channel.counter);
+
         // If output is enabled, set the pin in peripheral mode
         if (output && !_pinsEnabled[channel.counter.tc][N_CHANNELS_PER_COUNTER * channel.counter.n + channel.line]) {
             GPIO::enablePeripheral(PINS[channel.counter.tc][N_CHANNELS_PER_COUNTER * channel.counter.n + channel.line]);
             _pinsEnabled[channel.counter.tc][N_CHANNELS_PER_COUNTER * channel.counter.n + channel.line] = true;
         }
-
-        // Start the counter
-        start(channel.counter);
 
         return isValueValid;
     }
