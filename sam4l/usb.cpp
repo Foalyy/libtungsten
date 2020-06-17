@@ -778,7 +778,7 @@ namespace USB {
         _startOfFrameHandler = handler;
     }
 
-    void setControlHandler(int (*handler)(SetupPacket &_lastSetupPacket, uint8_t* data, int size)) {
+    void setControlHandler(int (*handler)(SetupPacket &lastSetupPacket, uint8_t* data, int size)) {
         _controlHandler = handler;
     }
 
