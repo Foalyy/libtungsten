@@ -47,7 +47,7 @@ namespace GPIO {
     // 48-pin packages only have port A, 64-pin packages have ports A and B,
     // and 100-pin packages have all A, B and C ports 
     const int N_PORTS = 3;
-    enum class Port {A, B, C};
+    enum class Port {A, B, C, UNDEFINED};
 
     // Each pin can either be controlled as a generic input/output (GPIO mode)
     // are be dedicated to one of up to 8 peripheral functions
@@ -162,6 +162,7 @@ namespace GPIO {
     const Pin PC29 = {Port::C, 29};
     const Pin PC30 = {Port::C, 30};
     const Pin PC31 = {Port::C, 31};
+    const Pin UNDEFINED = {Port::UNDEFINED, 0};
 
     // The PinState type can be used for clearer types, even though it's basically a boolean
     using PinState = bool;
@@ -224,6 +225,10 @@ namespace GPIO {
     // Internal initialization function. This is called in Core::init() and don't have to
     // be called by the user.
     void init();
+
+    // Helpers used to compare two pin numbers
+    inline bool operator==(const Pin& pin1, const Pin& pin2) { return pin1.port == pin2.port && pin1.number == pin2.number && pin1.function == pin2.function; }
+    inline bool operator!=(const Pin& pin1, const Pin& pin2) { return !(pin1 == pin2); }
 
 }
 
