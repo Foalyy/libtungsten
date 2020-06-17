@@ -369,6 +369,10 @@ namespace USART {
             } else {
                 length = BUFFER_SIZE - p->rxBufferCursorW;
             }
+            p->rxBufferCursorW += length;
+            if (p->rxBufferCursorW >= BUFFER_SIZE) {
+                p->rxBufferCursorW -= BUFFER_SIZE;
+            }
             DMA::startChannel(p->rxDMAChannel, (uint32_t)(p->rxBuffer + cur), length);
         }
 

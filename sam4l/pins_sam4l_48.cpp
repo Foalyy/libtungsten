@@ -156,12 +156,12 @@ namespace TC {
 
     GPIO::Pin PINS[MAX_N_TC][N_COUNTERS_PER_TC * N_CHANNELS_PER_COUNTER] = {
         {
-            {GPIO::Port::A,  8, GPIO::Periph::B}, // TC0 A0
-            {GPIO::Port::A,  9, GPIO::Periph::B}, // TC0 B0
-            {GPIO::Port::A, 10, GPIO::Periph::B}, // TC0 A1
-            {GPIO::Port::A, 11, GPIO::Periph::B}, // TC0 B1
-            {GPIO::Port::A, 12, GPIO::Periph::B}, // TC0 A2
-            {GPIO::Port::A, 13, GPIO::Periph::B}  // TC0 B2
+            {GPIO::Port::A,  8, GPIO::Periph::B}, // TC0_0A
+            {GPIO::Port::A,  9, GPIO::Periph::B}, // TC0_0B
+            {GPIO::Port::A, 10, GPIO::Periph::B}, // TC0_1A
+            {GPIO::Port::A, 11, GPIO::Periph::B}, // TC0_1B
+            {GPIO::Port::A, 12, GPIO::Periph::B}, // TC0_2A
+            {GPIO::Port::A, 13, GPIO::Periph::B}  // TC0_2B
         }
     };
 
