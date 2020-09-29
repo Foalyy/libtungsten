@@ -23,6 +23,7 @@ namespace Error {
         WDT,
         EIC,
         USB,
+        CRC,
         CUSTOM
     };
 

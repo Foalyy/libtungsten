@@ -109,7 +109,7 @@ namespace PM {
     // Peripheral clocks
     const int CLK_DMA = HSBMASK + HSBMASK_PDCA;
     const int CLK_USB_HSB = HSBMASK + HSBMASK_USBC; // The USB has 2 clocks
-    const int CLK_CRC = HSBMASK + HSBMASK_CRCCU;
+    const int CLK_CRC_HSB = HSBMASK + HSBMASK_CRCCU; // The CRC has 2 clocks
     const int CLK_AES = HSBMASK + HSBMASK_AESA;
     const int CLK_IIS = PBAMASK + PBAMASK_IISC;
     const int CLK_SPI = PBAMASK + PBAMASK_SPI;
@@ -129,6 +129,7 @@ namespace PM {
     const int CLK_DAC = PBAMASK + PBAMASK_DACC;
     const int CLK_GLOC = PBAMASK + PBAMASK_GLOC;
     const int CLK_TRNG = PBAMASK + PBAMASK_TRNG;
+    const int CLK_CRC = PBBMASK + PBBMASK_CRCCU;
     const int CLK_USB = PBBMASK + PBBMASK_USBC;
 
 
