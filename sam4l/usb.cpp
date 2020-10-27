@@ -10,6 +10,7 @@ namespace USB {
 
     // Current state of the driver during enumeration
     volatile State _state = State::SUSPEND;
+    volatile State _stateBeforeSuspend = State::POWERED;
 
     // Endpoints
     // The three least significant bits of UDESC.UDESCA are always zero according to the datasheet,
@@ -31,6 +32,8 @@ namespace USB {
 
 
     volatile bool _doEnableAddress = false;
+
+    volatile bool _deviceRemoteWakeup = false;
 
     // Default device descriptor content
     DeviceDescriptor _deviceDescriptor = {
@@ -287,6 +290,9 @@ namespace USB {
 
         // Suspend
         if (udinte & udint & (1 << UDINT_SUSP)) {
+            // Save the current state
+            _stateBeforeSuspend = _state;
+
             // Update the driver state
             _state = State::SUSPEND;
 
@@ -317,8 +323,8 @@ namespace USB {
 
         // Wake up
         if (udinte & udint & (1 << UDINT_WAKEUP)) {
-            // Update the driver state
-            _state = State::POWERED;
+            // Restore the driver state
+            _state = _stateBeforeSuspend;
 
             // Unfreeze clock
             (*(volatile uint32_t*)(USB_BASE + OFFSET_USBCON))
@@ -352,6 +358,7 @@ namespace USB {
 
             // Reset state
             _state = State::DEFAULT;
+            _stateBeforeSuspend = State::POWERED;
             _setupPacketAvailable = false;
             _doEnableAddress = false;
 
@@ -512,133 +519,200 @@ namespace USB {
 
             // Standard request
             if (_lastSetupPacket.requestType == SetupRequestType::STANDARD) {
+                uint8_t* bank = (uint8_t*)_epRAMDescriptors[EP_N * EP_DESCRIPTOR_SIZE + EP_ADDR];
 
-                // GET_DESCRIPTOR standard request
-                if (_lastSetupPacket.bRequest == USBREQ_GET_DESCRIPTOR) {
-                    uint8_t* bank = (uint8_t*)_epRAMDescriptors[EP_N * EP_DESCRIPTOR_SIZE + EP_ADDR];
+                // Request recipient : device
+                if (_lastSetupPacket.recipent == SetupRecipient::DEVICE) {
 
-                    // Select descriptor to send
-                    const uint8_t descriptorType = _lastSetupPacket.wValue >> 8;
-                    const uint8_t descriptorIndex = _lastSetupPacket.wValue & 0xFF;
-
-                    // Default device descriptor
-                    if (descriptorType == USBDESC_DEVICE && descriptorIndex == 0) {
+                    // GET_STATUS standard request
+                    if (_lastSetupPacket.bRequest == USBREQ_GET_STATUS) {
                         _lastSetupPacket.handled = true;
+                        bank[0] = 0x00;
+                        bank[1] = static_cast<int>(_deviceRemoteWakeup) << 1; // TODO : self-powered bit
+                        return 2;
 
-                        // Copy the descriptor to the bank
-                        const int length = min(_deviceDescriptor.bLength, _lastSetupPacket.wLength);
-                        memcpy(bank, (uint8_t*)&_deviceDescriptor, length);
-                        return length;
-
-                    // Default configuration and interface descriptors
-                    } else if (descriptorType == USBDESC_CONFIGURATION && descriptorIndex == 0) {
-                        _lastSetupPacket.handled = true;
-
-                        // Copy the configuration and interface descriptors to the bank
-                        uint8_t* bankCursor = bank;
-                        int length = min(_configurationDescriptor.wTotalLength, _lastSetupPacket.wLength);
-                        memcpy(bankCursor, (uint8_t*)&_configurationDescriptor, _configurationDescriptor.bLength);
-                        bankCursor += _configurationDescriptor.bLength;
-                        memcpy(bankCursor, (uint8_t*)&_interfaceDescriptor, _interfaceDescriptor.bLength);
-                        bankCursor += _interfaceDescriptor.bLength;
-                        for (int i = 1; i < _nEndpoints; i++) {
-                            // This loop starts at 1 because the descriptor of endpoint 0 must not be sent
-                            memcpy(bankCursor, (uint8_t*)&_endpoints[i].descriptor, _endpoints[i].descriptor.bLength);
-                            bankCursor += _endpoints[i].descriptor.bLength;
-                        }
-                        return length;
-
-                    // String0 descriptor (list of available languages)
-                    } else if (descriptorType == USBDESC_STRING && descriptorIndex == 0) {
-                        _lastSetupPacket.handled = true;
-
-                        // Copy the descriptor to the bank
-                        const int length = min(_string0Descriptor.bLength, _lastSetupPacket.wLength);
-                        memcpy(bank, (uint8_t*)&_string0Descriptor, length);
-                        return length;
-
-                    // String descriptor
-                    } else if (descriptorType == USBDESC_STRING && descriptorIndex <= static_cast<int>(StringDescriptors::NUMBER)) {
-                        _lastSetupPacket.handled = true;
-
-                        // Copy the descriptor to the bank
-                        const StringDescriptor stringDescriptor = _stringDescriptors[descriptorIndex - 1];
-                        const int length = min(stringDescriptor.bLength, _lastSetupPacket.wLength);
-                        memcpy(bank, (uint8_t*)&(stringDescriptor), 2); // bLength and bDescriptorType
-                        memcpy(bank + 2, stringDescriptor.bString, length - 2); // Actual string content
-                        return length;
-
-                    }
-
-                // SET_ADDRESS standard request
-                } else if (_lastSetupPacket.bRequest == USBREQ_SET_ADDRESS) {
-                    _lastSetupPacket.handled = true;
-
-                    // After a SET_ADDRESS request, the new address is configured (UDCON.UADD) but
-                    // not enabled (UDCON.ADDEN) immediately because the device must finish the
-                    // current transaction with the default address.
-                    // The IN interrupt is triggered for the first just after the SETUP request to
-                    // prepare the answer of the next IN transfer (request ACK). During this transfer
-                    // the address is written to UDCON but must not be enabled yet. When the ACK transfer
-                    // is sent, the bank is free once again and the IN interrupt is triggered a second
-                    // time. Since there is no Status Stage in a SET_ADDRESS request, this is a good
-                    // time to enable the address.
-                    if (!_doEnableAddress) {
-                        // Write address (disabled)
-                        uint32_t udcon = (*(volatile uint32_t*)(USB_BASE + OFFSET_UDCON));
-                        (*(volatile uint32_t*)(USB_BASE + OFFSET_UDCON))
-                            = (udcon & ~(uint32_t)(0xFF << UDCON_UADD))
-                            | _lastSetupPacket.wValue << UDCON_UADD;   // UADD : USB device address
-
-                        // Enable the flag
-                        _doEnableAddress = true;
-
-                    } else {
-                        // Enable address
-                        (*(volatile uint32_t*)(USB_BASE + OFFSET_UDCON))
-                            |= 1 << UDCON_ADDEN;   // ADDEN : enable address
-
-                        // There is no Status phase for a SET_ADDRESS, 
-                        // so disable IN interrupt now
-                        (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0CLR))
-                            = 1 << UECON_TXINE;
-                        
-                        // Move through the next enumeration step
-                        _state = State::ADDRESS;
-
-                        // Disable the flag
-                        _doEnableAddress = false;
-                    }
-
-                    // Answer with a ZLP
-                    return 0;
-
-                // SET_CONFIGURATION standard request
-                } else if (_lastSetupPacket.bRequest == USBREQ_SET_CONFIGURATION) {
-
-                    if (_state == State::ADDRESS || _state == State::CONFIGURED) {
-
-                        const uint8_t configurationId = _lastSetupPacket.wValue & 0xFF;
-
-                        if (configurationId == 0) {
+                    // USBREQ_CLEAR_FEATURE standard request
+                    } else if (_lastSetupPacket.bRequest == USBREQ_CLEAR_FEATURE) {
+                        if (_lastSetupPacket.wValue == USBFEAT_DEVICE_REMOTE_WAKEUP) {
                             _lastSetupPacket.handled = true;
+                            _deviceRemoteWakeup = false;
+                            return 0;
+                        }
+
+                    // USBREQ_SET_FEATURE standard request
+                    } else if (_lastSetupPacket.bRequest == USBREQ_SET_FEATURE) {
+                        if (_lastSetupPacket.wValue == USBFEAT_DEVICE_REMOTE_WAKEUP) {
+                            _lastSetupPacket.handled = true;
+                            _deviceRemoteWakeup = true;
+                            return 0;
+                        }
+
+                    // GET_DESCRIPTOR standard request
+                    } else if (_lastSetupPacket.bRequest == USBREQ_GET_DESCRIPTOR) {
+
+                        // Select descriptor to send
+                        const uint8_t descriptorType = _lastSetupPacket.wValue >> 8;
+                        const uint8_t descriptorIndex = _lastSetupPacket.wValue & 0xFF;
+
+                        // Default device descriptor
+                        if (descriptorType == USBDESC_DEVICE && descriptorIndex == 0) {
+                            _lastSetupPacket.handled = true;
+
+                            // Copy the descriptor to the bank
+                            const int length = min(_deviceDescriptor.bLength, _lastSetupPacket.wLength);
+                            memcpy(bank, (uint8_t*)&_deviceDescriptor, length);
+                            return length;
+
+                        // Default configuration and interface descriptors
+                        } else if (descriptorType == USBDESC_CONFIGURATION && descriptorIndex == 0) {
+                            _lastSetupPacket.handled = true;
+
+                            // Copy the configuration and interface descriptors to the bank
+                            uint8_t* bankCursor = bank;
+                            int length = min(_configurationDescriptor.wTotalLength, _lastSetupPacket.wLength);
+                            memcpy(bankCursor, (uint8_t*)&_configurationDescriptor, _configurationDescriptor.bLength);
+                            bankCursor += _configurationDescriptor.bLength;
+                            memcpy(bankCursor, (uint8_t*)&_interfaceDescriptor, _interfaceDescriptor.bLength);
+                            bankCursor += _interfaceDescriptor.bLength;
+                            for (int i = 1; i < _nEndpoints; i++) {
+                                // This loop starts at 1 because the descriptor of endpoint 0 must not be sent
+                                memcpy(bankCursor, (uint8_t*)&_endpoints[i].descriptor, _endpoints[i].descriptor.bLength);
+                                bankCursor += _endpoints[i].descriptor.bLength;
+                            }
+                            return length;
+
+                        // String0 descriptor (list of available languages)
+                        } else if (descriptorType == USBDESC_STRING && descriptorIndex == 0) {
+                            _lastSetupPacket.handled = true;
+
+                            // Copy the descriptor to the bank
+                            const int length = min(_string0Descriptor.bLength, _lastSetupPacket.wLength);
+                            memcpy(bank, (uint8_t*)&_string0Descriptor, length);
+                            return length;
+
+                        // String descriptor
+                        } else if (descriptorType == USBDESC_STRING && descriptorIndex <= static_cast<int>(StringDescriptors::NUMBER)) {
+                            _lastSetupPacket.handled = true;
+
+                            // Copy the descriptor to the bank
+                            const StringDescriptor stringDescriptor = _stringDescriptors[descriptorIndex - 1];
+                            const int length = min(stringDescriptor.bLength, _lastSetupPacket.wLength);
+                            memcpy(bank, (uint8_t*)&(stringDescriptor), 2); // bLength and bDescriptorType
+                            memcpy(bank + 2, stringDescriptor.bString, length - 2); // Actual string content
+                            return length;
+
+                        }
+
+                    // SET_ADDRESS standard request
+                    } else if (_lastSetupPacket.bRequest == USBREQ_SET_ADDRESS) {
+                        _lastSetupPacket.handled = true;
+
+                        // After a SET_ADDRESS request, the new address is configured (UDCON.UADD) but
+                        // not enabled (UDCON.ADDEN) immediately because the device must finish the
+                        // current transaction with the default address.
+                        // The IN interrupt is triggered for the first just after the SETUP request to
+                        // prepare the answer of the next IN transfer (request ACK). During this transfer
+                        // the address is written to UDCON but must not be enabled yet. When the ACK transfer
+                        // is sent, the bank is free once again and the IN interrupt is triggered a second
+                        // time. Since there is no Status Stage in a SET_ADDRESS request, this is a good
+                        // time to enable the address.
+                        if (!_doEnableAddress) {
+                            // Write address (disabled)
+                            uint32_t udcon = (*(volatile uint32_t*)(USB_BASE + OFFSET_UDCON));
+                            (*(volatile uint32_t*)(USB_BASE + OFFSET_UDCON))
+                                = (udcon & ~(uint32_t)(0xFF << UDCON_UADD))
+                                | _lastSetupPacket.wValue << UDCON_UADD;   // UADD : USB device address
+
+                            // Enable the flag
+                            _doEnableAddress = true;
+
+                        } else {
+                            // Enable address
+                            (*(volatile uint32_t*)(USB_BASE + OFFSET_UDCON))
+                                |= 1 << UDCON_ADDEN;   // ADDEN : enable address
+
+                            // There is no Status phase for a SET_ADDRESS, 
+                            // so disable IN interrupt now
+                            (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0CLR))
+                                = 1 << UECON_TXINE;
                             
-                            // The device is no longer configured, reset to Address state
+                            // Move through the next enumeration step
                             _state = State::ADDRESS;
-                        
-                            // Answer with a ZLP
-                            return 0;
 
-                        // There is only one configuration available
-                        } else if (configurationId == 1) {
-                            _lastSetupPacket.handled = true;
-
-                            // The device is now configured
-                            _state = State::CONFIGURED;
-                        
-                            // Answer with a ZLP
-                            return 0;
+                            // Disable the flag
+                            _doEnableAddress = false;
                         }
+
+                        // Answer with a ZLP
+                        return 0;
+
+                    // SET_CONFIGURATION standard request
+                    } else if (_lastSetupPacket.bRequest == USBREQ_SET_CONFIGURATION) {
+
+                        if (_state == State::ADDRESS || _state == State::CONFIGURED) {
+
+                            const uint8_t configurationId = _lastSetupPacket.wValue & 0xFF;
+
+                            if (configurationId == 0) {
+                                _lastSetupPacket.handled = true;
+                                
+                                // The device is no longer configured, reset to Address state
+                                _state = State::ADDRESS;
+                            
+                                // Answer with a ZLP
+                                return 0;
+
+                            // There is only one configuration available
+                            } else if (configurationId == 1) {
+                                _lastSetupPacket.handled = true;
+
+                                // The device is now configured
+                                _state = State::CONFIGURED;
+                            
+                                // Answer with a ZLP
+                                return 0;
+                            }
+                        }
+                    }
+
+                // Request recipient : interface
+                } else if (_lastSetupPacket.recipent == SetupRecipient::INTERFACE) {
+
+                    // uint8_t interface = _lastSetupPacket.wIndex & 0xFF; // Currently unused
+
+                    // GET_STATUS standard request
+                    if (_lastSetupPacket.bRequest == USBREQ_GET_STATUS) {
+                        _lastSetupPacket.handled = true;
+                        bank[0] = 0x00; // Always zero, reserved for future use
+                        bank[1] = 0x00;
+                        return 2;
+
+                    // GET_INTERFACE standard request
+                    } else if (_lastSetupPacket.bRequest == USBREQ_GET_INTERFACE) {
+                        // Not implemented
+
+                    // SET_INTERFACE standard request
+                    } else if (_lastSetupPacket.bRequest == USBREQ_SET_INTERFACE) {
+                        // Not implemented
+                    }
+
+                // Request recipient : endpoint
+                } else if (_lastSetupPacket.recipent == SetupRecipient::ENDPOINT) {
+
+                    // GET_STATUS standard request
+                    if (_lastSetupPacket.bRequest == USBREQ_GET_STATUS) {
+                        _lastSetupPacket.handled = true;
+                        bank[0] = 0x00; // Always zero for endpoint zero
+                        bank[1] = 0x00;
+                        return 2;
+
+                    // CLEAR_FEATURE standard request
+                    } else if (_lastSetupPacket.bRequest == USBREQ_CLEAR_FEATURE) {
+                        // Not implemented for endpoint zero
+
+                    // SET_FEATURE standard request
+                    } else if (_lastSetupPacket.bRequest == USBREQ_SET_FEATURE) {
+                        // Not implemented for endpoint zero
                     }
                 }
 

@@ -152,7 +152,7 @@ namespace USB {
 
     // USB requests codes
     const int USBREQ_GET_STATUS = 0;
-    const int USBREQ_CLEAR_FAILURE = 1;
+    const int USBREQ_CLEAR_FEATURE = 1;
     const int USBREQ_SET_FEATURE = 3;
     const int USBREQ_SET_ADDRESS = 5;
     const int USBREQ_GET_DESCRIPTOR = 6;
@@ -162,6 +162,10 @@ namespace USB {
     const int USBREQ_GET_INTERFACE = 10;
     const int USBREQ_SET_INTERFACE = 11;
     const int USBREQ_SYNC_FRAME = 12;
+
+
+    // USB Device features
+    const int USBFEAT_DEVICE_REMOTE_WAKEUP = 1;
 
 
     // USB descriptors
