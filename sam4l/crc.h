@@ -62,13 +62,9 @@ namespace CRC {
     };
 
     // Module API
-    void compute(const uint8_t* data, unsigned int length, Polynomial polynomial);
+    uint32_t compute(const uint8_t* data, unsigned int length, Polynomial polynomial, bool refOut=false, bool async=false);
     bool isResultAvailable();
     uint32_t getResult();
-    void check(const uint8_t* data, unsigned int length, uint32_t crc);
-    void enableInterrupt();
-    void disableInterrupt();
-
 
 }
 
