@@ -422,14 +422,9 @@ namespace USB {
                     if (ep->handlers[static_cast<int>(EPHandlerType::IN)] != nullptr) {
                         bytesToSend = ep->handlers[static_cast<int>(EPHandlerType::IN)](0);
                     }
-                    _epRAMDescriptors[i * EP_DESCRIPTOR_SIZE + EP_PCKSIZE] = bytesToSend & PCKSIZE_BYTE_COUNT_MASK;
+                    _epRAMDescriptors[i * EP_DESCRIPTOR_SIZE + EP_PCKSIZE] = (1 << PCKSIZE_AUTO_ZLP) | (bytesToSend & PCKSIZE_BYTE_COUNT_MASK);
                     // Multi-packet mode is automatically enabled if BYTE_COUNT (ie bytesToSend) is larger than 
                     // the endpoint size (UECFG.EPSIZE)
-
-                    // Enable AUTO_ZLP
-                    if (bytesToSend % EP_SIZES[static_cast<int>(_endpoints[i].size)] == 0) {
-                        _epRAMDescriptors[i * EP_DESCRIPTOR_SIZE + EP_PCKSIZE] |= 1 << PCKSIZE_AUTO_ZLP;
-                    }
 
                     // Clear interrupt (this will send the packet for a Control endpoint)
                     (*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR + i * 4))
