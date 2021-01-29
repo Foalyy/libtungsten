@@ -40,7 +40,8 @@ namespace Core {
     const uint32_t NVIC_IPR0 = 0xE000E400;  // Interrupt Priority Register 0
 
     // Peripheral Debug
-    const uint32_t PDBG = 0xE0042000; // Peripheral Debug Register
+    const uint32_t PDBG = 0xE0042000;  // Peripheral Debug Register
+    const uint32_t DEMCR = 0xE000EDFC; // Debug Exception and Monitor Control Register
 
     // ChipID and Serial number
     const uint32_t CHIPID_CIDR = 0x400E0740;

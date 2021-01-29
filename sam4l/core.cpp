@@ -53,6 +53,9 @@ namespace Core {
             | 0 << PDBG_AST     // Don't freeze AST when Core is halted in debug mode
             | 0 << PDBG_PEVC;   // Don't freeze PEVC when Core is halted in debug mode
 
+        // Disable DWT and ITM to free PA23
+        (*(volatile uint32_t*) DEMCR) = 0x00000000;
+
         // Init the error reporting system
         Error::init();
 
