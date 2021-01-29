@@ -78,7 +78,7 @@ else ifeq ($(strip $(CHIP_MODEL)),ls8x)
 else
 $(error Unknown CHIP_MODEL $(CHIP_MODEL), please use ls2x, ls4x or ls8x)
 endif
-PREPROC_DEFINES=-DPACKAGE=$(PACKAGE) -DBOOTLOADER=$(BOOTLOADER) -DDEBUG=$(DEBUG) -DN_FLASH_PAGES=$(N_FLASH_PAGES)
+PREPROC_DEFINES=-DPACKAGE=$(PACKAGE) -DBOOTLOADER=$(BOOTLOADER) -DDEBUG=$(DEBUG) -DN_FLASH_PAGES=$(N_FLASH_PAGES) $(USER_DEFINES)
 
 # Compilation flags
 # Note : do not use -O0, as this might generate code too slow for some peripherals (notably the SPI controller)
@@ -174,7 +174,7 @@ $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.o: $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%
 %.o: %.cpp %.h
 	$(CXX) $(CXXFLAGS) $(LFLAGS) -c $< -o $@
 
-%.o: %.c
+%.o: %.c %.h
 	$(CC) $(CFLAGS) $(LFLAGS) -c $< -o $@
 
 # Start OpenOCD, which is used to reset/flash the chip and as a remote target for GDB
