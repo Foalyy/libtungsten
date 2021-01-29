@@ -99,7 +99,7 @@ namespace SPI {
 
     // Master-mode functions
     void enableMaster();
-    bool addPeripheral(Peripheral peripheral, Mode mode=Mode::MODE0);
+    bool addPeripheral(Peripheral peripheral, Mode mode=Mode::MODE0, int delayBetweenBytes=0);
     uint8_t transfer(Peripheral peripheral, uint8_t tx=0, bool next=false);
     void transfer(Peripheral peripheral, const uint8_t* txBuffer, int txBufferSize, uint8_t* rxBuffer=nullptr, int rxBufferSize=-1, bool partial=false);
 

@@ -162,7 +162,7 @@ namespace SPI {
         }
     }
 
-    bool addPeripheral(Peripheral peripheral, Mode mode) {
+    bool addPeripheral(Peripheral peripheral, Mode mode, int delayBetweenBytes) {
         // Make sure the controller is enabled in master mode
         if (!_enabled) {
             enableMaster();
@@ -205,14 +205,14 @@ namespace SPI {
 
         // CSRn (Chip Select Register n) : configure the peripheral-specific settings
         (*(volatile uint32_t*)(SPI_BASE + OFFSET_CSR0 + peripheral * 0x04))
-            = cpol << CSR_CPOL      // CPOL : clock polarity
-            | ncpha << CSR_NCPHA    // CPHA : clock phase
-            | 0 << CSR_CSNAAT       // CSNAAT : CS doesn't rise between two consecutive transfers
-            | 0 << CSR_CSAAT        // CSAAT : CS always rises when the last transfer is complete
-            | 0b0000 << CSR_BITS    // BITS : 8 bits per transfer
-            | 4 << CSR_SCBR         // SCBR : SPI clock = CLK_SPI / 4 (not faster, otherwise the DMA/some code won't be able to keep up)
-            | 0 << CSR_DLYBS        // DLYBS : no delay between CS assertion and first clock cycle
-            | 0 << CSR_DLYBCT;      // DLYBCT : no delay between consecutive transfers
+            = cpol << CSR_CPOL                  // CPOL : clock polarity
+            | ncpha << CSR_NCPHA                // CPHA : clock phase
+            | 0 << CSR_CSNAAT                   // CSNAAT : CS doesn't rise between two consecutive transfers
+            | 0 << CSR_CSAAT                    // CSAAT : CS always rises when the last transfer is complete
+            | 0b0000 << CSR_BITS                // BITS : 8 bits per transfer
+            | 4 << CSR_SCBR                     // SCBR : SPI clock = CLK_SPI / 4 (not faster, otherwise the DMA/some code won't be able to keep up)
+            | 0 << CSR_DLYBS                    // DLYBS : no delay between CS assertion and first clock cycle
+            | delayBetweenBytes << CSR_DLYBCT;  // DLYBCT : no delay between consecutive transfers
 
         return true;
     }
