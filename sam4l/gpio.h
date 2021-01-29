@@ -186,6 +186,7 @@ namespace GPIO {
     void enableInput(const Pin& pin, Pulling pulling=Pulling::NONE);
     void enableOutput(const Pin& pin, PinState value);
     void setPulling(const Pin& pin, Pulling pulling);
+    void setDriveStrength(const Pin& pin, int strength);
     PinState get(const Pin& pin);
     void set(const Pin& pin, PinState value);
 

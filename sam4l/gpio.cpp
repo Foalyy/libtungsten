@@ -142,6 +142,29 @@ namespace GPIO {
         }
     }
 
+    void setDriveStrength(const Pin& pin, int strength) {
+        const uint32_t REG_BASE = GPIO_BASE + static_cast<uint8_t>(pin.port) * PORT_REG_SIZE;
+
+        // Check input
+        if (strength < 0) {
+            strength = 0;
+        } else if (strength > 3) {
+            strength = 3;
+        }
+
+        // ODCR (Output Driving Capability Register) : set the driving capability of this pin
+        if (strength & 0b01) {
+            ((volatile RSCT_REG*)(REG_BASE + OFFSET_ODCR0))->SET = 1 << pin.number;
+        } else {
+            ((volatile RSCT_REG*)(REG_BASE + OFFSET_ODCR0))->CLEAR = 1 << pin.number;
+        }
+        if (strength & 0b10) {
+            ((volatile RSCT_REG*)(REG_BASE + OFFSET_ODCR1))->SET = 1 << pin.number;
+        } else {
+            ((volatile RSCT_REG*)(REG_BASE + OFFSET_ODCR1))->CLEAR = 1 << pin.number;
+        }
+    }
+
     void enableInterrupt(const Pin& pin, Trigger trigger) {
         if (pin.port != Port::UNDEFINED) {
             const uint32_t REG_BASE = GPIO_BASE + static_cast<uint8_t>(pin.port) * PORT_REG_SIZE;

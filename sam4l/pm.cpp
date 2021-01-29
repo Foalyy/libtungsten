@@ -155,7 +155,7 @@ namespace PM {
         uint32_t wcause = (*(volatile uint32_t*)(BASE + OFFSET_WCAUSE));
         if (wcause != 0) {
             for (int i = 0; i < 32; i++) {
-                if (wcause & 1 << i) {
+                if (wcause & 1u << i) {
                     return static_cast<WakeUpCause>(i);
                 }
             }
