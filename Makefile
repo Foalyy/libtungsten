@@ -125,7 +125,7 @@ LFLAGS=--specs=nano.specs --specs=nosys.specs -L. -L$(ROOTDIR)/$(LIBNAME) -L$(RO
 
 # Default rule, compile the firmware in Intel HEX format, ready to be flashed/uploaded
 # https://en.wikipedia.org/wiki/Intel_HEX
-all: $(NAME).hex
+all: $(NAME).bin $(NAME).hex
 	@echo ""
 	@echo "== Finished compiling successfully!"
 
@@ -160,11 +160,16 @@ $(NAME).elf: _echo_config $(NAME).cpp $(STARTUP) $(STARTUP_DEP) _echo_comp_lib_o
 	$(CXX) $(CXXFLAGS) $(LFLAGS) $(NAME).cpp $(STARTUP) $(STARTUP_DEP) $(LIB_OBJS) $(UTILS_OBJS) $(USER_OBJS) -o $@
 
 # Convert from ELF to iHEX format
-$(NAME).hex: $(NAME).elf
+$(NAME).hex: $(NAME).elf $(NAME).bin
 	@echo ""
 	@echo "== Converting ELF to Intel HEX format"
-	$(OBJCOPY) -O ihex $^ $@
-	@echo "Binary size :" `$(SIZE) -d $(NAME).elf | tail -n 1 | cut -f 4` "bytes"
+	$(OBJCOPY) -O ihex $< $@
+# 	@echo "Binary size :" `$(SIZE) -d $(NAME).elf | tail -n 1 | cut -f 4` "bytes"
+	@echo "Binary size :" `ls -l $(NAME).bin | cut -d " " -f 5` "bytes"
+
+# Convert from ELF to bin format
+$(NAME).bin: $(NAME).elf
+	$(OBJCOPY) -O binary $< $@
 
 # Compile library
 $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.o: $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.cpp $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.h $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/pins_$(CHIP_FAMILY)_$(PACKAGE).cpp $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/interrupt_priorities.cpp
@@ -241,7 +246,8 @@ upload-serial: $(NAME).hex codeuploader
 # Compile the bootloader
 bootloader: $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader_config.h
 	make -C $(ROOTDIR)/$(LIBNAME)/bootloader
-	@echo "Bootloader size :" `$(SIZE) -d libtungsten/bootloader/bootloader.elf | tail -n 1 | cut -f 4` "bytes"
+# 	@echo "Bootloader size :" `$(SIZE) -d libtungsten/bootloader/bootloader.elf | tail -n 1 | cut -f 4` "bytes"
+	@echo "Bootloader size :" `ls -l libtungsten/bootloader/bootloader.bin | cut -d " " -f 4` "bytes"
 
 # Flash the bootloader into the chip using OpenOCD
 flash-bootloader: bootloader
