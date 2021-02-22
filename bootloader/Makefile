@@ -17,5 +17,5 @@ TOOLCHAIN_PATH=/home/foaly/Software/gcc-arm-none-eabi/bin/
 # Include the main lib makefile
 ROOTDIR=../..
 LDSCRIPTNAME=bootloader.ld
-ADD_CXXFLAGS=-fno-unwind-tables  -fno-exceptions
+ADD_CXXFLAGS=-fno-unwind-tables -fno-exceptions
 include ../Makefile

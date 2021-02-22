@@ -1,4 +1,6 @@
 *.o
 *.elf
 *.hex
+*.bin
+*.map
 codeuploader
