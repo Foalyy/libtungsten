@@ -51,7 +51,7 @@ namespace CRC {
         }
     }
 
-    uint32_t compute(const uint8_t* data, unsigned int length, Polynomial polynomial, bool refOut, bool async) {
+    uint32_t compute(const uint8_t* data, unsigned int length, Polynomial polynomial, bool refOut, bool async, bool continuation) {
         // Make sure the module is enabled
         enable();
 
@@ -60,7 +60,7 @@ namespace CRC {
         _refOut = refOut;
 
         // Check the input size
-        if (length > 0xFFFF) {
+        if (length > MAX_BLOCK_SIZE) {
             Error::happened(Error::Module::CRC, WARN_OVERFLOW, Error::Severity::WARNING);
             return 0;
         }
@@ -94,9 +94,11 @@ namespace CRC {
         (*(volatile uint32_t*)(BASE + OFFSET_DSCR))
             = reinterpret_cast<uint32_t>(&_desc);
 
-        // CR (Control Register) : reset the controller
-        (*(volatile uint32_t*)(BASE + OFFSET_CR))
-            = 1 << CR_RESET;
+        if (!continuation) {
+            // CR (Control Register) : reset the controller
+            (*(volatile uint32_t*)(BASE + OFFSET_CR))
+                = 1 << CR_RESET;
+        }
 
         // MR (Mode Register) : configure the computation
         (*(volatile uint32_t*)(BASE + OFFSET_MR))

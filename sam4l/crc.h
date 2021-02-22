@@ -49,6 +49,9 @@ namespace CRC {
     const uint8_t DSCR_CTRL_TRWIDTH = 24;
     const uint8_t DSCR_CTRL_IEN = 27;
 
+    // Constants
+    const unsigned int MAX_BLOCK_SIZE = 0xFFFF;
+
     // Error codes
     const Error::Code WARN_BUSY = 0x0001;
     const Error::Code WARN_OVERFLOW = 0x0002;
@@ -62,7 +65,7 @@ namespace CRC {
     };
 
     // Module API
-    uint32_t compute(const uint8_t* data, unsigned int length, Polynomial polynomial, bool refOut=false, bool async=false);
+    uint32_t compute(const uint8_t* data, unsigned int length, Polynomial polynomial, bool refOut=false, bool async=false, bool continuation=false);
     bool isResultAvailable();
     uint32_t getResult();
 
