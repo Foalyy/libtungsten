@@ -185,6 +185,7 @@ namespace TC {
     // PWM mode
     bool enablePWM(Channel channel, float period=0, float highTime=0, bool output=true, SourceClock sourceClock=SourceClock::PBA_OVER_8, unsigned long sourceClockFrequency=0);
     bool setPeriod(Counter counter, float period);
+    bool setPeriod(Channel channel, float period);
     bool setHighTime(Channel channel, float highTime);
     bool setDutyCycle(Channel channel, int percent);
     void enableOutput(Channel channel);

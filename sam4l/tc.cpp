@@ -154,17 +154,17 @@ namespace TC {
 
         // Disable the interrupts
         (*(volatile uint32_t*)(REG + OFFSET_IDR0)) = 0xFFFFFFFF;
-        memset(_counterOverflowHandler, 0, sizeof(_counterOverflowHandler));
-        memset(_counterOverflowHandlerEnabled, 0, sizeof(_counterOverflowHandlerEnabled));
-        memset(_counterOverflowInternalHandler, 0, sizeof(_counterOverflowInternalHandler));
-        memset(_rbLoadingHandler, 0, sizeof(_rbLoadingHandler));
-        memset(_rbLoadingHandlerEnabled, 0, sizeof(_rbLoadingHandlerEnabled));
-        memset(_rbLoadingInternalHandler, 0, sizeof(_rbLoadingInternalHandler));
-        memset(_rcCompareHandler, 0, sizeof(_rcCompareHandler));
-        memset(_rcCompareHandlerEnabled, 0, sizeof(_rcCompareHandlerEnabled));
-        memset(_rcCompareInternalHandler, 0, sizeof(_rcCompareInternalHandler));
-        memset(_counterModeFullHandler, 0, sizeof(_counterModeFullHandler));
-        memset(_counterModeFullHandlerEnabled, 0, sizeof(_counterModeFullHandlerEnabled));
+        _counterOverflowHandler[counter.tc][counter.n] = nullptr;
+        _counterOverflowHandlerEnabled[counter.tc][counter.n] = false;
+        _counterOverflowInternalHandler[counter.tc][counter.n] = nullptr;
+        _rbLoadingHandler[counter.tc][counter.n] = nullptr;
+        _rbLoadingHandlerEnabled[counter.tc][counter.n] = false;
+        _rbLoadingInternalHandler[counter.tc][counter.n] = nullptr;
+        _rcCompareHandler[counter.tc][counter.n] = nullptr;
+        _rcCompareHandlerEnabled[counter.tc][counter.n] = false;
+        _rcCompareInternalHandler[counter.tc][counter.n] = nullptr;
+        _counterModeFullHandler[counter.tc][counter.n] = nullptr;
+        _counterModeFullHandlerEnabled[counter.tc][counter.n] = false;
 
         // Disable the output pins
         for (int i = 0; i < N_CHANNELS_PER_COUNTER; i++) {
@@ -179,9 +179,6 @@ namespace TC {
             GPIO::disablePeripheral(PINS_CLK[counter.tc][counter.n]);
             _pinsCLKEnabled[counter.tc][counter.n] = false;
         }
-
-        // Disable the module clock
-        PM::disablePeripheralClock(PM::CLK_TC0 + counter.tc);
     }
 
 
@@ -454,6 +451,11 @@ namespace TC {
             return false;
         }
         return setRC(counter, period * clockFrequency / 1000000L);
+    }
+
+    // Set the period in microseconds for both TIOA and TIOB of the specified channel
+    bool setPeriod(Channel channel, float period) {
+        return setPeriod(channel.counter, period);
     }
 
     // Set the high time of the specified channel in microseconds
