@@ -61,6 +61,8 @@ GDB=$(TOOLCHAIN_PATH)arm-none-eabi-gdb
 SIZE=$(TOOLCHAIN_PATH)arm-none-eabi-size
 OBJDUMP=$(TOOLCHAIN_PATH)arm-none-eabi-objdump
 OPENOCD=openocd
+OPENOCD_PORT=4444
+NETCAT=netcat
 
 # Architecture options
 ARCH_FLAGS=-mthumb -mcpu=cortex-m$(CORTEX_M)
@@ -190,26 +192,26 @@ openocd:
 flash: $(NAME).hex
 	@echo ""
 	@echo "== Flashing into chip (make sure OpenOCD is started in background using 'make openocd')"
-	echo "reset halt; flash write_image erase unlock $(NAME).hex; reset run; exit" | netcat localhost 4444
+	echo "reset halt; flash write_image erase unlock $(NAME).hex; reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)
 
 # Flash the firmware into the chip by automatically starting a temporary OpenOCD instance
 autoflash: $(NAME).hex
-	$(OPENOCD) -f $(OPENOCD_CFG) & (sleep 1; echo "reset halt; flash write_image erase unlock $(NAME).hex; reset run; exit" | netcat localhost 4444) > /dev/null; killall openocd
+	$(OPENOCD) -f $(OPENOCD_CFG) & (sleep 1; echo "reset halt; flash write_image erase unlock $(NAME).hex; reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)) > /dev/null; killall openocd
 
 # Erase the chip's flash using OpenOCD
 erase:
 	@echo "== Erasing the chip's flash..."
-	echo "reset halt; flash erase_sector 0 0 last; exit" | netcat localhost 4444
+	echo "reset halt; flash erase_sector 0 0 last; exit" | $(NETCAT) localhost $(OPENOCD_PORT)
 
 # Pause the chip execution using OpenOCD
 pause:
 	@echo "== Halting the chip execution..."
-	echo "reset halt; exit" | netcat localhost 4444
+	echo "reset halt; exit" | $(NETCAT) localhost $(OPENOCD_PORT)
 
 # Reset the chip using OpenOCD
 reset:
 	@echo "== Resetting the chip..."
-	echo "reset run; exit" | netcat localhost 4444
+	echo "reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)
 
 # Open GDB through OpenOCD to debug the firmware
 debug: pause
@@ -251,11 +253,11 @@ bootloader: $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader_config.h
 
 # Flash the bootloader into the chip using OpenOCD
 flash-bootloader: bootloader
-	echo "reset halt; flash write_image erase unlock $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.hex; reset run; exit" | netcat localhost 4444
+	echo "reset halt; flash write_image erase unlock $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.hex; reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)
 
 # Flash the bootloader into the chip by automatically starting a temporary OpenOCD instance
 autoflash-bootloader: bootloader
-	$(OPENOCD) -f $(OPENOCD_CFG) & (sleep 1; echo "reset halt; flash write_image erase unlock $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.hex; reset run; exit" | netcat localhost 4444) > /dev/null; killall openocd
+	$(OPENOCD) -f $(OPENOCD_CFG) & (sleep 1; echo "reset halt; flash write_image erase unlock $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.hex; reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)) > /dev/null; killall openocd
 
 # Debug the bootloader
 debug-bootloader: pause
