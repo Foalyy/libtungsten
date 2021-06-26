@@ -157,8 +157,4 @@ namespace AST {
         (*(volatile uint32_t*)(BASE + OFFSET_SCR)) = 1 << SR_ALARM0;
     }
 
-    bool alarmPassed() {
-        return *(volatile uint32_t*)(BASE + OFFSET_CV) >= *(volatile uint32_t*)(BASE + OFFSET_AR0);
-    }
-
 }

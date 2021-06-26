@@ -22,9 +22,9 @@ namespace AST {
     const uint32_t OFFSET_IMR =         0x018; // Interrupt Mask Register
     const uint32_t OFFSET_WER =         0x01C; // Wake Enable Register
     const uint32_t OFFSET_AR0 =         0x020; // Alarm Register 0
-    //const uint32_t OFFSET_AR1 =         0x024; // Alarm Register 1 -- not implemented
+    //const uint32_t OFFSET_AR1 =       0x024; // Alarm Register 1 -- not implemented
     const uint32_t OFFSET_PIR0 =        0x030; // Periodic Interval Register 0
-    //const uint32_t OFFSET_PIR1 =        0x034; // Periodic Interval Register 1 -- not implemented
+    //const uint32_t OFFSET_PIR1 =      0x034; // Periodic Interval Register 1 -- not implemented
     const uint32_t OFFSET_CLOCK =       0x040; // Clock Control Register
     const uint32_t OFFSET_DTR =         0x044; // Digital Tuner Register
     const uint32_t OFFSET_EVE =         0x048; // Event Enable Register
@@ -57,10 +57,10 @@ namespace AST {
 
     // Module API
     void init();
-    inline Time time() { return ((_currentTimeHighBytes + (*(volatile uint32_t*)(BASE + OFFSET_CV))) * 1000) / (32768/2); };
+    inline volatile Time time() { return ((_currentTimeHighBytes + (*(volatile uint32_t*)(BASE + OFFSET_CV))) * 1000) / (32768/2); };
     void enableAlarm(Time time, bool relative=true, void (*handler)()=nullptr, bool wake=true);
     void disableAlarm();
-    bool alarmPassed();
+    inline volatile bool alarmPassed() { return *(volatile uint32_t*)(BASE + OFFSET_CV) >= *(volatile uint32_t*)(BASE + OFFSET_AR0); }
 
 }
 
