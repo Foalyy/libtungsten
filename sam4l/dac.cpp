@@ -8,7 +8,7 @@ namespace DAC {
     extern struct GPIO::Pin PIN_VOUT;
 
     bool _enabled = false;
-    int _dmaChannel = 0;
+    int _dmaChannel = -1;
 
     // Enable the DAC controller
     void enable() {
@@ -40,7 +40,7 @@ namespace DAC {
             = WPMR_WPKEY
             | 1 << WPMR_WPEN;
 
-        _dmaChannel = DMA::newChannel(DMA::Device::DAC, DMA::Size::HALFWORD);
+        _dmaChannel = DMA::setupChannel(_dmaChannel, DMA::Device::DAC, DMA::Size::HALFWORD);
 
         _enabled = true;
     }

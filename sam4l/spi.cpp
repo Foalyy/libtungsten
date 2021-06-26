@@ -154,12 +154,8 @@ namespace SPI {
             = 1 << CR_SPIEN;        // SPIEN : SPI Enable
 
         // Set up the DMA channels and related interrupts
-        if (_rxDMAChannel < 0) {
-            _rxDMAChannel = DMA::newChannel(DMA::Device::SPI_RX, DMA::Size::BYTE);
-        }
-        if (_txDMAChannel < 0) {
-            _txDMAChannel = DMA::newChannel(DMA::Device::SPI_TX, DMA::Size::BYTE);
-        }
+        _rxDMAChannel = DMA::setupChannel(_rxDMAChannel, DMA::Device::SPI_RX, DMA::Size::BYTE);
+        _txDMAChannel = DMA::setupChannel(_txDMAChannel, DMA::Device::SPI_TX, DMA::Size::BYTE);
     }
 
     bool addPeripheral(Peripheral peripheral, Mode mode, int delayBetweenBytes) {
@@ -412,12 +408,8 @@ namespace SPI {
             = 1 << CR_SPIEN;        // SPIEN : SPI Enable
 
         // Set up the DMA channels and related interrupts
-        if (_rxDMAChannel < 0) {
-            _rxDMAChannel = DMA::newChannel(DMA::Device::SPI_RX, DMA::Size::BYTE);
-        }
-        if (_txDMAChannel < 0) {
-            _txDMAChannel = DMA::newChannel(DMA::Device::SPI_TX, DMA::Size::BYTE);
-        }
+        _rxDMAChannel = DMA::setupChannel(_rxDMAChannel, DMA::Device::SPI_RX, DMA::Size::BYTE);
+        _txDMAChannel = DMA::setupChannel(_txDMAChannel, DMA::Device::SPI_TX, DMA::Size::BYTE);
 
         // SPI mode
         uint8_t cpol = static_cast<int>(mode) & 0b10;

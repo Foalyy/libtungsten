@@ -37,8 +37,8 @@ namespace USART {
         int rxBufferCursorR;
         int rxBufferCursorW;
         int txBufferCursor;
-        int rxDMAChannel;
-        int txDMAChannel;
+        int rxDMAChannel = -1;
+        int txDMAChannel = -1;
     };
     struct USART _ports[N_PORTS];
 
@@ -116,8 +116,8 @@ namespace USART {
         (*(volatile uint32_t*)(REG_BASE + OFFSET_WPMR)) = WPMR_KEY | WPMR_ENABLE;
 
         // Set up the DMA channels and related interrupts
-        p->rxDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::USART0_RX) + static_cast<int>(port)), DMA::Size::BYTE);
-        p->txDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::USART0_TX) + static_cast<int>(port)), DMA::Size::BYTE);
+        p->rxDMAChannel = DMA::setupChannel(p->rxDMAChannel, static_cast<DMA::Device>(static_cast<int>(DMA::Device::USART0_RX) + static_cast<int>(port)), DMA::Size::BYTE);
+        p->txDMAChannel = DMA::setupChannel(p->txDMAChannel, static_cast<DMA::Device>(static_cast<int>(DMA::Device::USART0_TX) + static_cast<int>(port)), DMA::Size::BYTE);
         _rxDMAChannelsToPorts[p->rxDMAChannel] = static_cast<int>(port);
         DMA::startChannel(p->rxDMAChannel, (uint32_t)(p->rxBuffer), BUFFER_SIZE);
         //DMA::reloadChannel(p->rxDMAChannel, (uint32_t)(p->rxBuffer), BUFFER_SIZE);

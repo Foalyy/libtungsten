@@ -93,6 +93,7 @@ namespace DMA {
 
     // Module API
     int newChannel(Device device, Size size, uint32_t address=0x00000000, uint16_t length=0, bool ring=false);
+    int setupChannel(int channel, Device device, Size size, uint32_t address=0x00000000, uint16_t length=0, bool ring=false);
     void enableInterrupt(int channel, void (*handler)(), Interrupt interrupt=Interrupt::TRANSFER_FINISHED);
     void disableInterrupt(int channel, Interrupt interrupt=Interrupt::TRANSFER_FINISHED);
     void setupChannel(int channel, uint32_t address, uint16_t length);

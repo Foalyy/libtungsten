@@ -23,7 +23,7 @@ namespace I2C {
     };
 
     // List of available ports
-    struct Channel ports[N_PORTS_M];
+    struct Channel _ports[N_PORTS_M];
 
     // Interrupt handlers
     extern uint8_t INTERRUPT_PRIORITY;
@@ -55,7 +55,7 @@ namespace I2C {
             return false;
         }
         const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
-        struct Channel* p = &(ports[static_cast<int>(port)]);
+        struct Channel* p = &(_ports[static_cast<int>(port)]);
 
         // If this port is already enabled in slave mode, disable it
         if (p->mode == Mode::SLAVE) {
@@ -107,12 +107,8 @@ namespace I2C {
             | 2 << M_SRR_FILTER;
 
         // Set up the DMA channels and related interrupts
-        if (p->rxDMAChannel == -1) {
-            p->rxDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_M_RX) + static_cast<int>(port)), DMA::Size::BYTE);
-        }
-        if (p->txDMAChannel == -1) {
-            p->txDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_M_TX) + static_cast<int>(port)), DMA::Size::BYTE);
-        }
+        p->rxDMAChannel = DMA::setupChannel(p->rxDMAChannel, static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_M_RX) + static_cast<int>(port)), DMA::Size::BYTE);
+        p->txDMAChannel = DMA::setupChannel(p->txDMAChannel, static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_M_TX) + static_cast<int>(port)), DMA::Size::BYTE);
 
         // Set the pins in peripheral mode
         GPIO::enablePeripheral(PINS_SDA[static_cast<int>(port)]);
@@ -125,7 +121,7 @@ namespace I2C {
     // to another master. If no other master is present and this condition arises, 
     // this may be the sign of an electrical problem (short circuit or missing pull-ups).
     bool checkArbitrationLost(Port port) {
-        struct Channel* p = &(ports[static_cast<int>(port)]);
+        struct Channel* p = &(_ports[static_cast<int>(port)]);
         if (p->mode != Mode::MASTER) {
             Error::happened(Error::Module::I2C, ERR_PORT_NOT_INITIALIZED, Error::Severity::CRITICAL);
             return false;
@@ -144,7 +140,7 @@ namespace I2C {
     // Try to send a read request to the specified address and return true if
     // a slave device has answered
     bool testAddress(Port port, uint8_t address, Dir direction) {
-        struct Channel* p = &(ports[static_cast<int>(port)]);
+        struct Channel* p = &(_ports[static_cast<int>(port)]);
         if (p->mode != Mode::MASTER) {
             Error::happened(Error::Module::I2C, ERR_PORT_NOT_INITIALIZED, Error::Severity::CRITICAL);
             return false;
@@ -200,7 +196,7 @@ namespace I2C {
 
     // Master read
     unsigned int read(Port port, uint8_t address, uint8_t* buffer, int n, bool* acked) {
-        struct Channel* p = &(ports[static_cast<int>(port)]);
+        struct Channel* p = &(_ports[static_cast<int>(port)]);
         if (p->mode != Mode::MASTER) {
             Error::happened(Error::Module::I2C, ERR_PORT_NOT_INITIALIZED, Error::Severity::CRITICAL);
             return 0;
@@ -273,7 +269,7 @@ namespace I2C {
 
     // Master write
     bool write(Port port, uint8_t address, const uint8_t* buffer, int n) {
-        struct Channel* p = &(ports[static_cast<int>(port)]);
+        struct Channel* p = &(_ports[static_cast<int>(port)]);
         if (p->mode != Mode::MASTER) {
             Error::happened(Error::Module::I2C, ERR_PORT_NOT_INITIALIZED, Error::Severity::CRITICAL);
             return false;
@@ -364,7 +360,7 @@ namespace I2C {
     // This is especially useful for reading registers on devices by writing the register address
     // then reading the value
     unsigned int writeRead(Port port, uint8_t address, const uint8_t* txBuffer, int nTX, uint8_t* rxBuffer, int nRX, bool* acked) {
-        struct Channel* p = &(ports[static_cast<int>(port)]);
+        struct Channel* p = &(_ports[static_cast<int>(port)]);
         if (p->mode != Mode::MASTER) {
             Error::happened(Error::Module::I2C, ERR_PORT_NOT_INITIALIZED, Error::Severity::CRITICAL);
             return false;
@@ -473,7 +469,7 @@ namespace I2C {
             return false;
         }
         const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
-        struct Channel* p = &(ports[static_cast<int>(port)]);
+        struct Channel* p = &(_ports[static_cast<int>(port)]);
 
         // If this port is already enabled in master mode, disable it
         if (p->mode == Mode::MASTER) {
@@ -522,8 +518,8 @@ namespace I2C {
         (*(volatile uint32_t*)(REG_BASE + OFFSET_S_NBYTES)) = 0;
 
         // Set up the DMA channels
-        p->rxDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_S_RX) + static_cast<int>(port)), DMA::Size::BYTE);
-        p->txDMAChannel = DMA::newChannel(static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_S_TX) + static_cast<int>(port)), DMA::Size::BYTE);
+        p->rxDMAChannel = DMA::setupChannel(p->rxDMAChannel, static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_S_RX) + static_cast<int>(port)), DMA::Size::BYTE);
+        p->txDMAChannel = DMA::setupChannel(p->txDMAChannel, static_cast<DMA::Device>(static_cast<int>(DMA::Device::I2C0_S_TX) + static_cast<int>(port)), DMA::Size::BYTE);
 
         // SRR (Slew Rate Register) : setup the lines
         // See Electrical Characteristics in the datasheet for more details
@@ -555,7 +551,7 @@ namespace I2C {
 
     // Slave read
     int read(Port port, uint8_t* buffer, int n, bool async) {
-        struct Channel* p = &(ports[static_cast<int>(port)]);
+        struct Channel* p = &(_ports[static_cast<int>(port)]);
         if (p->mode != Mode::SLAVE) {
             Error::happened(Error::Module::I2C, ERR_PORT_NOT_INITIALIZED, Error::Severity::CRITICAL);
             return 0;
@@ -598,7 +594,7 @@ namespace I2C {
 
     // Slave write
     bool write(Port port, const uint8_t* buffer, int n, bool async) {
-        struct Channel* p = &(ports[static_cast<int>(port)]);
+        struct Channel* p = &(_ports[static_cast<int>(port)]);
         if (p->mode != Mode::SLAVE) {
             Error::happened(Error::Module::I2C, ERR_PORT_NOT_INITIALIZED, Error::Severity::CRITICAL);
             return false;
@@ -673,7 +669,7 @@ namespace I2C {
     }
 
     bool isAsyncReadFinished(Port port) {
-        struct Channel* p = &(ports[static_cast<int>(port)]);
+        struct Channel* p = &(_ports[static_cast<int>(port)]);
         if (p->mode != Mode::SLAVE) {
             Error::happened(Error::Module::I2C, ERR_PORT_NOT_INITIALIZED, Error::Severity::CRITICAL);
             return false;
@@ -684,7 +680,7 @@ namespace I2C {
     }
 
     bool isAsyncWriteFinished(Port port) {
-        struct Channel* p = &(ports[static_cast<int>(port)]);
+        struct Channel* p = &(_ports[static_cast<int>(port)]);
         if (p->mode != Mode::SLAVE) {
             Error::happened(Error::Module::I2C, ERR_PORT_NOT_INITIALIZED, Error::Severity::CRITICAL);
             return false;
@@ -696,7 +692,7 @@ namespace I2C {
 
     // Get the number of bytes which have been read in the current async transfer
     int getAsyncReadCounter(Port port) {
-        struct Channel* p = &(ports[static_cast<int>(port)]);
+        struct Channel* p = &(_ports[static_cast<int>(port)]);
         if (p->mode != Mode::SLAVE) {
             Error::happened(Error::Module::I2C, ERR_PORT_NOT_INITIALIZED, Error::Severity::CRITICAL);
             return 0;
@@ -718,7 +714,7 @@ namespace I2C {
 
     // Get the number of bytes which have been written in the current async transfer
     int getAsyncWriteCounter(Port port) {
-        struct Channel* p = &(ports[static_cast<int>(port)]);
+        struct Channel* p = &(_ports[static_cast<int>(port)]);
         if (p->mode != Mode::SLAVE) {
             Error::happened(Error::Module::I2C, ERR_PORT_NOT_INITIALIZED, Error::Severity::CRITICAL);
             return 0;
@@ -730,7 +726,7 @@ namespace I2C {
     }
 
     void enableInterrupt(Port port, void (*handler)(), Interrupt interrupt) {
-        struct Channel* p = &(ports[static_cast<int>(port)]);
+        struct Channel* p = &(_ports[static_cast<int>(port)]);
         if (p->mode != Mode::SLAVE) {
             Error::happened(Error::Module::I2C, ERR_PORT_NOT_INITIALIZED, Error::Severity::CRITICAL);
             return;
@@ -805,7 +801,7 @@ namespace I2C {
     // Disable the port and release its ressources
     void disable(Port port) {
         const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
-        struct Channel* p = &(ports[static_cast<int>(port)]);
+        struct Channel* p = &(_ports[static_cast<int>(port)]);
         
         // Free the pins in peripheral mode
         GPIO::disablePeripheral(PINS_SDA[static_cast<int>(port)]);
@@ -849,7 +845,7 @@ namespace I2C {
     // See the datasheet §27.9.8 for more details.
     uint32_t getStatus(Port port) {
         const uint32_t REG_BASE = I2C_BASE[static_cast<int>(port)];
-        struct Channel* p = &(ports[static_cast<int>(port)]);
+        struct Channel* p = &(_ports[static_cast<int>(port)]);
         if (p->mode == Mode::MASTER) {
             return (*(volatile uint32_t*)(REG_BASE + OFFSET_M_SR));
         } else if (p->mode == Mode::SLAVE) {

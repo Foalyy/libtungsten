@@ -25,7 +25,22 @@ namespace DMA {
 
         // Channel number : take the last channel
         int n = _nChannels;
-        const uint32_t REG_BASE = BASE + n * CHANNEL_REG_SIZE;
+        _nChannels++;
+
+        // Setup the chosen channel
+        setupChannel(n, device, size, address, length, ring);
+
+        return n;
+    }
+
+    // Create a channel or reuse an existing one
+    int setupChannel(int channel, Device device, Size size, uint32_t address, uint16_t length, bool ring) {
+        // If the given channel is negative, create a new one
+        if (channel < 0) {
+            return newChannel(device, size, address, length, ring);
+        }
+
+        const uint32_t REG_BASE = BASE + channel * CHANNEL_REG_SIZE;
 
         // Make sure the clock for the PDCA (Peripheral DMA Controller) is enabled
         PM::enablePeripheralClock(PM::CLK_DMA);
@@ -37,8 +52,8 @@ namespace DMA {
         (*(volatile uint32_t*)(REG_BASE + OFFSET_MARR)) = 0;                                        // Buffer memory address (reload value)
         (*(volatile uint32_t*)(REG_BASE + OFFSET_TCRR)) = 0;                                        // Buffer length (reload value)
         (*(volatile uint32_t*)(REG_BASE + OFFSET_MR)) = (static_cast<int>(size) & 0b11) << MR_SIZE; // Buffer unit size (byte, half-word or word)
-        _channels[n].started = false;
-        _channels[n].interruptsEnabled = false;
+        _channels[channel].started = false;
+        _channels[channel].interruptsEnabled = false;
 
         // Enable the ring buffer
         if (ring) {
@@ -50,9 +65,7 @@ namespace DMA {
         // Enable transfer
         (*(volatile uint32_t*)(REG_BASE + OFFSET_CR)) = 1;
 
-        _nChannels++;
-
-        return n;
+        return channel;
     }
 
     void enableInterrupt(int channel, void (*handler)(), Interrupt interrupt) {
