@@ -53,7 +53,7 @@ namespace Core {
             | 0 << PDBG_AST     // Don't freeze AST when Core is halted in debug mode
             | 0 << PDBG_PEVC;   // Don't freeze PEVC when Core is halted in debug mode
 
-        // Disable DWT and ITM to free PA23
+        // Disable DWT and ITM to free PA23 (used by I2C0) when a debugger is connected
         (*(volatile uint32_t*) DEMCR) = 0x00000000;
 
         // Init the error reporting system
@@ -265,9 +265,9 @@ namespace Core {
             // an interrupt with a sufficient priority is triggered
             // See §B1.5.17 Power Management in the ARMv7-M Architecture Reference Manual
             __asm__ __volatile__("WFI");
-        } while (!(length > 0 
-                    ? AST::alarmPassed()                    // If length is specified, wait until the AST alarm is triggered
-                    : PM::wakeUpCause() != PM::WakeUpCause::UNKNOWN)); // Otherwise, wait for any interrupt
+        } while (length > 0 
+                    ? !AST::alarmPassed()          // If length is specified, wait until the AST alarm is triggered
+                    : PM::isWakeUpCauseUnknown()); // Otherwise, wait for any interrupt
     }
 
     // The default sleep mode is SLEEP0

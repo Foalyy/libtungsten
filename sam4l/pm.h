@@ -211,6 +211,7 @@ namespace PM {
     // Wake-up and reset
     ResetCause resetCause();
     WakeUpCause wakeUpCause();
+    inline volatile bool isWakeUpCauseUnknown() { return (*(volatile uint32_t*)(BASE + OFFSET_WCAUSE)) == 0; }
     void enableWakeUpSource(WakeUpSource src);
     void disableWakeUpSource(WakeUpSource src);
     void disableWakeUpSources();
