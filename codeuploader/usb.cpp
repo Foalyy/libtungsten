@@ -69,9 +69,7 @@ int usbOpenDevice(uint16_t vid, uint16_t pid, uint8_t interface) {
     // Claim the interface
     r = libusb_claim_interface(_handle, interface);
     if (r < 0) {
-        printLibUSBError("Unable to claim device's interface", r);
-        libusb_close(_handle);
-        return r;
+        printLibUSBError("Warning: unable to claim device's interface", r);
     }
 
     return 0;

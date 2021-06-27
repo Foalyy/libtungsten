@@ -30,6 +30,9 @@ endif
 ifndef BOOTLOADER
 	BOOTLOADER=false
 endif
+ifndef CUSTOM_BOOTLOADER
+	CUSTOM_BOOTLOADER=false
+endif
 ifndef CREATE_MAP
 	CREATE_MAP=false
 endif
@@ -106,9 +109,10 @@ CFLAGS=$(ARCH_FLAGS) \
 
 # Linking flags
 ifndef LD_SCRIPT_NAME
-	LD_SCRIPT_NAME=usercode_$(CHIP_MODEL).ld
 	ifeq ($(strip $(BOOTLOADER)), true)
 		LD_SCRIPT_NAME=usercode_bootloader_$(CHIP_MODEL).ld
+	else
+		LD_SCRIPT_NAME=usercode_$(CHIP_MODEL).ld
 	endif
 endif
 ifeq ($(strip $(CREATE_MAP)), true)
@@ -116,6 +120,12 @@ ifeq ($(strip $(CREATE_MAP)), true)
 endif
 LFLAGS=--specs=nano.specs --specs=nosys.specs -L. -L$(ROOTDIR)/$(LIBNAME) -L$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) -L$(ROOTDIR)/$(LIBNAME)/carbide -L$(ROOTDIR)/$(LIBNAME)/ld_scripts -T $(LD_SCRIPT_NAME) -Wl,--gc-sections $(MAP)
 
+# Custom bootloader
+ifeq ($(strip $(CUSTOM_BOOTLOADER)), true)
+	BOOTLOADER_ROOTDIR=$(ROOTDIR)/bootloader
+else
+	BOOTLOADER_ROOTDIR=$(ROOTDIR)/$(LIBNAME)/bootloader
+endif
 
 
 ### RULES
@@ -145,7 +155,7 @@ _echo_config:
 	@echo "    CREATE_MAP=$(CREATE_MAP)"
 	@echo "    LD_SCRIPT_NAME=$(LD_SCRIPT_NAME)"
 	@echo ""
-	@echo "(if configuration has changed since the last compilation, remember to perform 'make clean' first)"
+	@echo "(if the configuration has changed since the last compilation, remember to perform 'make clean' first)"
 
 _echo_comp_lib_objs:
 	@echo ""
@@ -246,29 +256,29 @@ upload-serial: $(NAME).hex codeuploader
 ## Bootloader-related rules
 
 # Compile the bootloader
-bootloader: $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader_config.h
-	make -C $(ROOTDIR)/$(LIBNAME)/bootloader
-# 	@echo "Bootloader size :" `$(SIZE) -d libtungsten/bootloader/bootloader.elf | tail -n 1 | cut -f 4` "bytes"
-	@echo "Bootloader size :" `ls -l libtungsten/bootloader/bootloader.bin | cut -d " " -f 4` "bytes"
+bootloader: $(BOOTLOADER_ROOTDIR)/bootloader_config.h
+	make -C $(BOOTLOADER_ROOTDIR)
+# 	@echo "Bootloader size :" `$(SIZE) -d $(BOOTLOADER_ROOTDIR)/bootloader.elf | tail -n 1 | cut -f 4` "bytes"
+	@echo "Bootloader size :" `ls -l $(BOOTLOADER_ROOTDIR)/bootloader.bin | cut -d " " -f 4` "bytes"
 
 # Flash the bootloader into the chip using OpenOCD
 flash-bootloader: bootloader
-	echo "reset halt; flash write_image erase unlock $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.hex; reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)
+	echo "reset halt; flash write_image erase unlock $(BOOTLOADER_ROOTDIR)/bootloader.hex; reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)
 
 # Flash the bootloader into the chip by automatically starting a temporary OpenOCD instance
 autoflash-bootloader: bootloader
-	$(OPENOCD) -f $(OPENOCD_CFG) & (sleep 1; echo "reset halt; flash write_image erase unlock $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.hex; reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)) > /dev/null; killall openocd
+	$(OPENOCD) -f $(OPENOCD_CFG) & (sleep 1; echo "reset halt; flash write_image erase unlock $(BOOTLOADER_ROOTDIR)/bootloader.hex; reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)) > /dev/null; killall openocd
 
 # Debug the bootloader
 debug-bootloader: pause
-	$(GDB) -ex "set print pretty on" -ex "target extended-remote localhost:3333" $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.elf
+	$(GDB) -ex "set print pretty on" -ex "target extended-remote localhost:3333" $(BOOTLOADER_ROOTDIR)/bootloader.elf
 
 # Flash and debug the bootloader
 flash-debug-bootloader: flash-bootloader debug-bootloader
 
 # Show the disassembly of the compiled bootloader
 objdump-bootloader: bootloader
-	$(OBJDUMP) -d $(ROOTDIR)/$(LIBNAME)/bootloader/bootloader.elf | less
+	$(OBJDUMP) -d $(BOOTLOADER_ROOTDIR)/bootloader.elf | less
 
 
 ## USBCom
@@ -291,6 +301,6 @@ clean: clean-all
 
 clean-all: 
 	rm -f $(NAME).elf $(NAME).map $(NAME).hex *.o $(ROOTDIR)/$(LIBNAME)/*.o $(ROOTDIR)/$(LIBNAME)/utils/*.o $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/*.o $(ROOTDIR)/$(LIBNAME)/carbide/*.o
-	cd $(ROOTDIR)/$(LIBNAME)/bootloader; rm -f bootloader.elf bootloader.hex *.o
+	cd $(BOOTLOADER_ROOTDIR); rm -f bootloader.elf bootloader.hex *.o
 	cd $(ROOTDIR)/$(LIBNAME)/codeuploader; rm -f codeuploader *.o
 	make -C $(ROOTDIR)/$(LIBNAME)/usbcom clean

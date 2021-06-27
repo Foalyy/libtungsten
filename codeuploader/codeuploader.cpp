@@ -56,6 +56,7 @@ string ERROR_STRINGS[] = {
 
 bool waitReady();
 void debug(const char* str);
+void debug(string str);
 uint8_t ask(Request request, uint16_t value=0, uint16_t index=0);
 int sendRequest(Request request, uint16_t value=0, uint16_t index=0, Direction direction=Direction::OUTPUT, uint8_t* buffer=nullptr, uint16_t length=0);
 
@@ -168,15 +169,17 @@ int main(int argc, char** argv) {
         line = lines.at(i);
 
         // Compute percentage
-        int p = 100 * (i + 1) / s;
-        if (p > lastp) {
-            if (i > 0) {
-                cout << "\b\b\b";
+        if (!DEBUG) {
+            int p = 100 * (i + 1) / s;
+            if (p > lastp) {
+                if (i > 0) {
+                    cout << "\b\b\b";
+                }
+                if (p < 10) {
+                    cout << "0";
+                }
+                cout << p << "%" << flush;
             }
-            if (p < 10) {
-                cout << "0";
-            }
-            cout << p << "%" << flush;
         }
 
         // Remove newline at the end
@@ -199,7 +202,7 @@ int main(int argc, char** argv) {
 
         } else {
             debug("Sending WRITE request");
-            //cout << line << endl;
+            debug(line);
             sendRequest(Request::WRITE, 0, frameNumber, Direction::OUTPUT, (uint8_t*)line.data(), line.size());
             frameNumber++;
             if (i < s - 1) { // If not last frame
@@ -280,8 +283,13 @@ bool waitReady() {
 
 void debug(const char* str) {
     if (DEBUG) {
-        printf(str);
-        printf("\n");
+        cout << str << endl;
+    }
+}
+
+void debug(string str) {
+    if (DEBUG) {
+        cout << str << endl;
     }
 }
 
