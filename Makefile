@@ -33,6 +33,9 @@ endif
 ifndef CUSTOM_BOOTLOADER
 	CUSTOM_BOOTLOADER=false
 endif
+ifndef CUSTOM_CODEUPLOADER
+	CUSTOM_CODEUPLOADER=false
+endif
 ifndef CREATE_MAP
 	CREATE_MAP=false
 endif
@@ -125,6 +128,13 @@ ifeq ($(strip $(CUSTOM_BOOTLOADER)), true)
 	BOOTLOADER_ROOTDIR=$(ROOTDIR)/bootloader
 else
 	BOOTLOADER_ROOTDIR=$(ROOTDIR)/$(LIBNAME)/bootloader
+endif
+
+# Custom codeuploader
+ifeq ($(strip $(CUSTOM_CODEUPLOADER)), true)
+	CODEUPLOADER_ROOTDIR=$(ROOTDIR)/codeuploader
+else
+	CODEUPLOADER_ROOTDIR=$(ROOTDIR)/$(LIBNAME)/codeuploader
 endif
 
 
@@ -239,18 +249,18 @@ objdump: $(NAME).hex
 
 # Compile the codeuploader
 codeuploader:
-	make -C $(ROOTDIR)/$(LIBNAME)/codeuploader
+	make -C $(CODEUPLOADER_ROOTDIR)
 
 # Upload user code via bootloader with the default channel : USB
 upload: upload-usb
 
 # Upload through USB
 upload-usb: $(NAME).hex codeuploader
-	$(ROOTDIR)/$(LIBNAME)/codeuploader/codeuploader $(NAME).hex
+	$(CODEUPLOADER_ROOTDIR)/codeuploader $(NAME).hex
 
 # Upload through serial port
 upload-serial: $(NAME).hex codeuploader
-	$(ROOTDIR)/$(LIBNAME)/codeuploader/codeuploader $(NAME).hex $(SERIAL_PORT)
+	$(CODEUPLOADER_ROOTDIR)/codeuploader $(NAME).hex $(SERIAL_PORT)
 
 
 ## Bootloader-related rules
@@ -301,6 +311,6 @@ clean: clean-all
 
 clean-all: 
 	rm -f $(NAME).elf $(NAME).map $(NAME).hex *.o $(ROOTDIR)/$(LIBNAME)/*.o $(ROOTDIR)/$(LIBNAME)/utils/*.o $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/*.o $(ROOTDIR)/$(LIBNAME)/carbide/*.o
-	cd $(BOOTLOADER_ROOTDIR); rm -f bootloader.elf bootloader.hex *.o
-	cd $(ROOTDIR)/$(LIBNAME)/codeuploader; rm -f codeuploader *.o
+	cd $(BOOTLOADER_ROOTDIR); rm -f bootloader.elf bootloader.bin bootloader.hex *.o
+	cd $(CODEUPLOADER_ROOTDIR); rm -f codeuploader *.o
 	make -C $(ROOTDIR)/$(LIBNAME)/usbcom clean
