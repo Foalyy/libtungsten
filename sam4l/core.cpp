@@ -256,18 +256,21 @@ namespace Core {
             // Enable an alarm to wake up the chip after a specified
             // amount of time
             AST::enableAlarm(length);
-        }
 
-        // Sleep until a known event happens
-        do {
-            // WFI : Wait For Interrupt
-            // This special ARM instruction can put the chip in sleep mode until
-            // an interrupt with a sufficient priority is triggered
-            // See §B1.5.17 Power Management in the ARMv7-M Architecture Reference Manual
-            __asm__ __volatile__("WFI");
-        } while (length > 0 
-                    ? !AST::alarmPassed()          // If length is specified, wait until the AST alarm is triggered
-                    : PM::isWakeUpCauseUnknown()); // Otherwise, wait for any interrupt
+            // Wait until the alarm has passed
+            while (!AST::alarmPassed()) {
+                // WFI : Wait For Interrupt
+                // This special ARM instruction can put the chip in sleep mode until
+                // an interrupt with a sufficient priority is triggered
+                // See §B1.5.17 Power Management in the ARMv7-M Architecture Reference Manual
+                __asm__ __volatile__("WFI");
+            }
+        } else {
+            do {
+                // See comment about WFI above
+                __asm__ __volatile__("WFI");
+            } while (PM::isWakeUpCauseUnknown());
+        }
     }
 
     // The default sleep mode is SLEEP0
