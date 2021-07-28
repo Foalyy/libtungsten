@@ -116,6 +116,7 @@ namespace AST {
             time += *(volatile uint32_t*)(BASE + OFFSET_CV);
         }
         (*(volatile uint32_t*)(BASE + OFFSET_AR0)) = (uint32_t)time;
+        waitWhileBusy();
         
         // IER (Interrupt Enable Register) : enable the Alarm interrupt
         (*(volatile uint32_t*)(BASE + OFFSET_IER)) = 1 << SR_ALARM0;

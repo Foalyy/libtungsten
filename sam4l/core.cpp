@@ -265,7 +265,9 @@ namespace Core {
                 // See §B1.5.17 Power Management in the ARMv7-M Architecture Reference Manual
                 __asm__ __volatile__("WFI");
             }
+
         } else {
+            // Wait until any known interrupt is triggered
             do {
                 // See comment about WFI above
                 __asm__ __volatile__("WFI");
