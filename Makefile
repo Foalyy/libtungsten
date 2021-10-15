@@ -18,6 +18,12 @@ endif
 ifndef PACKAGE
 	PACKAGE=64
 endif
+ifndef BUILD_PREFIX
+	BUILD_PREFIX=$(NAME)
+endif
+ifndef BUILD_PATH
+	BUILD_PATH=$(ROOTDIR)/build
+endif
 ifndef OPENOCD_CFG
 	OPENOCD_CFG=$(ROOTDIR)/$(LIBNAME)/openocd.cfg
 endif
@@ -49,9 +55,9 @@ CORE_MODULES=pins_$(CHIP_FAMILY)_$(PACKAGE) ast bpm bscif core dma error flash g
 LIB_MODULES=$(CORE_MODULES) $(MODULES)
 
 # Compilation objects
-LIB_OBJS=$(addprefix $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/,$(addsuffix .o,$(LIB_MODULES)))
-UTILS_OBJS=$(addprefix $(ROOTDIR)/$(LIBNAME)/utils/,$(addsuffix .o,$(UTILS_MODULES)))
-USER_OBJS=$(addsuffix .o,$(USER_MODULES))
+LIB_OBJS=$(addprefix $(BUILD_PATH)/$(BUILD_PREFIX)/$(LIBNAME)/$(CHIP_FAMILY)/,$(addsuffix .o,$(LIB_MODULES)))
+UTILS_OBJS=$(addprefix $(BUILD_PATH)/$(BUILD_PREFIX)/$(LIBNAME)/utils/,$(addsuffix .o,$(UTILS_MODULES)))
+USER_OBJS=$(addprefix $(BUILD_PATH)/$(BUILD_PREFIX)/,$(addsuffix .o,$(USER_MODULES)))
 
 # Carbide-specific options
 ifeq ($(strip $(CARBIDE)), true)
@@ -119,7 +125,7 @@ ifndef LD_SCRIPT_NAME
 	endif
 endif
 ifeq ($(strip $(CREATE_MAP)), true)
-	MAP=-Wl,-Map=$(NAME).map
+	MAP=-Wl,-Map=$(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).map
 endif
 LFLAGS=--specs=nano.specs --specs=nosys.specs -L. -L$(ROOTDIR)/$(LIBNAME) -L$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) -L$(ROOTDIR)/$(LIBNAME)/carbide -L$(ROOTDIR)/$(LIBNAME)/ld_scripts -T $(LD_SCRIPT_NAME) -Wl,--gc-sections $(MAP)
 
@@ -140,18 +146,22 @@ endif
 
 ### RULES
 
-.PHONY: flash pause reset debug flash-debug objdump codeuploader upload bootloader flash-bootloader debug-bootloader objdump-bootloader openocd clean clean-all _echo_config _echo_comp_lib_objs _echo_comp_user_objs
+.PHONY: flash pause reset debug flash-debug objdump codeuploader upload bootloader flash-bootloader debug-bootloader objdump-bootloader openocd clean clean-all _create_build_path _echo_config _echo_comp_lib_objs _echo_comp_user_objs
 
 
 ## Usercode-related rules
 
 # Default rule, compile the firmware in Intel HEX format, ready to be flashed/uploaded
 # https://en.wikipedia.org/wiki/Intel_HEX
-all: $(NAME).bin $(NAME).hex
+all: $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).bin $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex
 	@echo ""
 	@echo "== Finished compiling successfully!"
 
+_create_build_path:
+	@mkdir -p $(BUILD_PATH)/$(BUILD_PREFIX)
+
 _echo_config:
+	@echo ""
 	@echo "== Configuration summary :"
 	@echo ""
 	@echo "    CARBIDE=$(CARBIDE)"
@@ -176,32 +186,72 @@ _echo_comp_user_objs:
 	@echo "== Compiling user-defined modules..."
 
 # Compile user code in the standard ELF format
-$(NAME).elf: _echo_config $(NAME).cpp $(STARTUP) $(STARTUP_DEP) _echo_comp_lib_objs $(LIB_OBJS) $(UTILS_OBJS) _echo_comp_user_objs $(USER_OBJS)
+$(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).elf: _create_build_path _echo_config $(NAME).cpp $(STARTUP) $(STARTUP_DEP) _echo_comp_lib_objs $(LIB_OBJS) $(UTILS_OBJS) _echo_comp_user_objs $(USER_OBJS)
 	@echo ""
 	@echo "== Compiling ELF..."
 	$(CXX) $(CXXFLAGS) $(LFLAGS) $(NAME).cpp $(STARTUP) $(STARTUP_DEP) $(LIB_OBJS) $(UTILS_OBJS) $(USER_OBJS) -o $@
 
 # Convert from ELF to iHEX format
-$(NAME).hex: $(NAME).elf $(NAME).bin
+$(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex: $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).elf $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).bin
 	@echo ""
 	@echo "== Converting ELF to Intel HEX format"
 	$(OBJCOPY) -O ihex $< $@
 # 	@echo "Binary size :" `$(SIZE) -d $(NAME).elf | tail -n 1 | cut -f 4` "bytes"
-	@echo "Binary size :" `ls -l $(NAME).bin | cut -d " " -f 5` "bytes"
+	@echo "Binary size :" `ls -l $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).bin | cut -d " " -f 5` "bytes"
 
 # Convert from ELF to bin format
-$(NAME).bin: $(NAME).elf
+$(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).bin: $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).elf
 	$(OBJCOPY) -O binary $< $@
 
+# Automatic generation of source dependencies
+.SECONDEXPANSION:
+$(BUILD_PATH)/$(BUILD_PREFIX)/%.d: $(ROOTDIR)/%.cpp $$(wildcard %.h)
+	@echo "Updating dependencies of $<"
+	@mkdir -p $(dir $@)
+	@$(CXX) $(CXXFLAGS) -MM -MT $(@:.d=.o) -c $< > $@
+$(BUILD_PATH)/$(BUILD_PREFIX)/%.d: $(ROOTDIR)/%.c $$(wildcard %.h)
+	@echo "Updating dependencies of $<"
+	@mkdir -p $(dir $@)
+	@$(CC) $(CFLAGS) -MM -MT $(@:.d=.o) -c $< > $@
+ifneq ($(MAKECMDGOALS),openocd)
+ifneq ($(MAKECMDGOALS),erase)
+ifneq ($(MAKECMDGOALS),pause)
+ifneq ($(MAKECMDGOALS),reset)
+ifneq ($(MAKECMDGOALS),debug)
+ifneq ($(MAKECMDGOALS),objdump)
+ifneq ($(MAKECMDGOALS),bootloader)
+ifneq ($(MAKECMDGOALS),flash-bootloader)
+ifneq ($(MAKECMDGOALS),autoflash-bootloader)
+ifneq ($(MAKECMDGOALS),debug-bootloader)
+ifneq ($(MAKECMDGOALS),debug-flash-bootloader)
+ifneq ($(MAKECMDGOALS),clean)
+include $(LIB_OBJS:.o=.d)
+include $(UTILS_OBJS:.o=.d)
+include $(USER_OBJS:.o=.d)
+endif
+endif
+endif
+endif
+endif
+endif
+endif
+endif
+endif
+endif
+endif
+endif
+
 # Compile library
-$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.o: $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.cpp $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.h $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/pins_$(CHIP_FAMILY)_$(PACKAGE).cpp $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/interrupt_priorities.cpp
+$(BUILD_PATH)/$(BUILD_PREFIX)/$(LIBNAME)/$(CHIP_FAMILY)/%.o: $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/%.cpp $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/pins_$(CHIP_FAMILY)_$(PACKAGE).cpp $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/interrupt_priorities.cpp
+	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(LFLAGS) -c $< -o $@
 
 # Compile other modules
-%.o: %.cpp %.h
+$(BUILD_PATH)/$(BUILD_PREFIX)/%.o: $(ROOTDIR)/%.cpp
+	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(LFLAGS) -c $< -o $@
 
-%.o: %.c %.h
+$(BUILD_PATH)/$(BUILD_PREFIX)/%.o: $(ROOTDIR)/%.c
 	$(CC) $(CFLAGS) $(LFLAGS) -c $< -o $@
 
 # Start OpenOCD, which is used to reset/flash the chip and as a remote target for GDB
@@ -209,14 +259,14 @@ openocd:
 	$(OPENOCD) -f $(OPENOCD_CFG)
 
 # Flash the firmware into the chip using OpenOCD
-flash: $(NAME).hex
+flash: $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex
 	@echo ""
 	@echo "== Flashing into chip (make sure OpenOCD is started in background using 'make openocd')"
-	echo "reset halt; flash write_image erase unlock $(NAME).hex; reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)
+	echo "reset halt; flash write_image erase unlock $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex; reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)
 
 # Flash the firmware into the chip by automatically starting a temporary OpenOCD instance
-autoflash: $(NAME).hex
-	$(OPENOCD) -f $(OPENOCD_CFG) & (sleep 1; echo "reset halt; flash write_image erase unlock $(NAME).hex; reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)) > /dev/null; killall openocd
+autoflash: $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex
+	$(OPENOCD) -f $(OPENOCD_CFG) & (sleep 1; echo "reset halt; flash write_image erase unlock $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex; reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)) > /dev/null; killall openocd
 
 # Erase the chip's flash using OpenOCD
 erase:
@@ -235,14 +285,14 @@ reset:
 
 # Open GDB through OpenOCD to debug the firmware
 debug: pause
-	$(GDB) -ex "set print pretty on" -ex "target extended-remote localhost:3333" $(NAME).elf
+	$(GDB) -ex "set print pretty on" -ex "target extended-remote localhost:3333" $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).elf
 
 # Flash and debug the firmware
 flash-debug: flash debug
 
 # Show the disassembly of the compiled program
-objdump: $(NAME).hex
-	$(OBJDUMP) -dSC $(NAME).elf | less
+objdump: $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex
+	$(OBJDUMP) -dSC $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).elf | less
 
 
 ## Codeuploader-related rules
@@ -255,12 +305,12 @@ codeuploader:
 upload: upload-usb
 
 # Upload through USB
-upload-usb: $(NAME).hex codeuploader
-	$(CODEUPLOADER_ROOTDIR)/codeuploader $(NAME).hex
+upload-usb: $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex codeuploader
+	$(BUILD_PATH)/codeuploader/codeuploader $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex
 
 # Upload through serial port
-upload-serial: $(NAME).hex codeuploader
-	$(CODEUPLOADER_ROOTDIR)/codeuploader $(NAME).hex $(SERIAL_PORT)
+upload-serial: $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex codeuploader
+	$(BUILD_PATH)/codeuploader/codeuploader $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex $(SERIAL_PORT)
 
 
 ## Bootloader-related rules
@@ -268,27 +318,25 @@ upload-serial: $(NAME).hex codeuploader
 # Compile the bootloader
 bootloader: $(BOOTLOADER_ROOTDIR)/bootloader_config.h
 	make -C $(BOOTLOADER_ROOTDIR)
-# 	@echo "Bootloader size :" `$(SIZE) -d $(BOOTLOADER_ROOTDIR)/bootloader.elf | tail -n 1 | cut -f 4` "bytes"
-	@echo "Bootloader size :" `ls -l $(BOOTLOADER_ROOTDIR)/bootloader.bin | cut -d " " -f 4` "bytes"
 
 # Flash the bootloader into the chip using OpenOCD
 flash-bootloader: bootloader
-	echo "reset halt; flash write_image erase unlock $(BOOTLOADER_ROOTDIR)/bootloader.hex; reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)
+	make -C $(BOOTLOADER_ROOTDIR) flash
 
 # Flash the bootloader into the chip by automatically starting a temporary OpenOCD instance
 autoflash-bootloader: bootloader
-	$(OPENOCD) -f $(OPENOCD_CFG) & (sleep 1; echo "reset halt; flash write_image erase unlock $(BOOTLOADER_ROOTDIR)/bootloader.hex; reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)) > /dev/null; killall openocd
+	make -C $(BOOTLOADER_ROOTDIR) autoflash
 
 # Debug the bootloader
 debug-bootloader: pause
-	$(GDB) -ex "set print pretty on" -ex "target extended-remote localhost:3333" $(BOOTLOADER_ROOTDIR)/bootloader.elf
+	make -C $(BOOTLOADER_ROOTDIR) debug
 
 # Flash and debug the bootloader
 flash-debug-bootloader: flash-bootloader debug-bootloader
 
 # Show the disassembly of the compiled bootloader
 objdump-bootloader: bootloader
-	$(OBJDUMP) -d $(BOOTLOADER_ROOTDIR)/bootloader.elf | less
+	make -C $(BOOTLOADER_ROOTDIR) objdump
 
 
 ## USBCom
@@ -309,8 +357,5 @@ usbcom_write:
 # 2/ to add the 'clean-all' dependency
 clean: clean-all
 
-clean-all: 
-	rm -f $(NAME).elf $(NAME).map $(NAME).hex *.o $(ROOTDIR)/$(LIBNAME)/*.o $(ROOTDIR)/$(LIBNAME)/utils/*.o $(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/*.o $(ROOTDIR)/$(LIBNAME)/carbide/*.o
-	cd $(BOOTLOADER_ROOTDIR); rm -f bootloader.elf bootloader.bin bootloader.hex *.o
-	cd $(CODEUPLOADER_ROOTDIR); rm -f codeuploader *.o
-	make -C $(ROOTDIR)/$(LIBNAME)/usbcom clean
+clean-all:
+	rm -r $(BUILD_PATH)
