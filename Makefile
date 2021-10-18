@@ -25,7 +25,10 @@ ifndef BUILD_PATH
 	BUILD_PATH=$(ROOTDIR)/build
 endif
 ifndef OPENOCD_CFG
-	OPENOCD_CFG=$(ROOTDIR)/$(LIBNAME)/openocd.cfg
+	OPENOCD_CFG=$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/openocd.cfg
+endif
+ifndef JTAG_ADAPTER
+	JTAG_ADAPTER=cmsis-dap
 endif
 ifndef CARBIDE
 	CARBIDE=false
@@ -256,7 +259,7 @@ $(BUILD_PATH)/$(BUILD_PREFIX)/%.o: $(ROOTDIR)/%.c
 
 # Start OpenOCD, which is used to reset/flash the chip and as a remote target for GDB
 openocd:
-	$(OPENOCD) -f $(OPENOCD_CFG)
+	$(OPENOCD) -c "source [find interface/$(JTAG_ADAPTER).cfg]" -f $(OPENOCD_CFG)
 
 # Flash the firmware into the chip using OpenOCD
 flash: $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex
