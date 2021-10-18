@@ -130,7 +130,7 @@ endif
 ifeq ($(strip $(CREATE_MAP)), true)
 	MAP=-Wl,-Map=$(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).map
 endif
-LFLAGS=--specs=nano.specs --specs=nosys.specs -L. -L$(ROOTDIR)/$(LIBNAME) -L$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) -L$(ROOTDIR)/$(LIBNAME)/carbide -L$(ROOTDIR)/$(LIBNAME)/ld_scripts -T $(LD_SCRIPT_NAME) -Wl,--gc-sections $(MAP)
+LFLAGS=--specs=nano.specs --specs=nosys.specs -L. -L$(ROOTDIR)/$(LIBNAME) -L$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY) -L$(ROOTDIR)/$(LIBNAME)/carbide -L$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/ld_scripts -T $(LD_SCRIPT_NAME) -Wl,--gc-sections $(MAP)
 
 # Custom bootloader
 ifeq ($(strip $(CUSTOM_BOOTLOADER)), true)
