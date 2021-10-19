@@ -146,6 +146,8 @@ else
 	CODEUPLOADER_ROOTDIR=$(ROOTDIR)/$(LIBNAME)/codeuploader
 endif
 
+OPENOCD_ARGS=-c "source [find interface/$(JTAG_ADAPTER).cfg]" -f $(OPENOCD_CFG)
+
 
 ### RULES
 
@@ -259,7 +261,7 @@ $(BUILD_PATH)/$(BUILD_PREFIX)/%.o: $(ROOTDIR)/%.c
 
 # Start OpenOCD, which is used to reset/flash the chip and as a remote target for GDB
 openocd:
-	$(OPENOCD) -c "source [find interface/$(JTAG_ADAPTER).cfg]" -f $(OPENOCD_CFG)
+	$(OPENOCD) $(OPENOCD_ARGS)
 
 # Flash the firmware into the chip using OpenOCD
 flash: $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex
@@ -269,7 +271,7 @@ flash: $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex
 
 # Flash the firmware into the chip by automatically starting a temporary OpenOCD instance
 autoflash: $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex
-	$(OPENOCD) -f $(OPENOCD_CFG) & (sleep 1; echo "reset halt; flash write_image erase unlock $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex; reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)) > /dev/null; killall openocd
+	$(OPENOCD) $(OPENOCD_ARGS) & (sleep 1; echo "reset halt; flash write_image erase unlock $(BUILD_PATH)/$(BUILD_PREFIX)/$(NAME).hex; reset run; exit" | $(NETCAT) localhost $(OPENOCD_PORT)) > /dev/null; killall openocd
 
 # Erase the chip's flash using OpenOCD
 erase:
