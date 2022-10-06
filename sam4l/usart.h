@@ -121,11 +121,30 @@ namespace USART {
         CTS
     };
 
-    const int BUFFER_SIZE = 2048;
+    // Size of the buffers used to send/receive data on the ports.
+    // Each port uses two buffers of this size.
+    const int BUFFER_SIZE = 256;
+
+    // Port
+    struct USART {
+        unsigned long baudrate;
+        bool hardwareFlowControl;
+        CharLength charLength;
+        Parity parity;
+        StopBit stopBit;
+        uint8_t rxBuffer[BUFFER_SIZE];
+        uint8_t txBuffer[BUFFER_SIZE];
+        int rxBufferCursorR;
+        int rxBufferCursorW;
+        int txBufferCursor;
+        int rxDMAChannel = -1;
+        int txDMAChannel = -1;
+    };
 
 
     // Error codes
-    const Error::Code ERR_BAUDRATE_OUT_OF_RANGE = 0x0001;
+    const Error::Code ERR_PORT_NOT_AVAILABLE = 0x0001;
+    const Error::Code ERR_BAUDRATE_OUT_OF_RANGE = 0x0002;
 
 
     // Module API

@@ -85,6 +85,21 @@ ARCH_FLAGS=-mthumb -mcpu=cortex-m$(CORTEX_M)
 # Startup code
 STARTUP=$(ROOTDIR)/$(LIBNAME)/$(CHIP_FAMILY)/startup.cpp
 
+# Condition-compiled USART ports
+USE_USARTS=
+ifeq ($(strip $(USE_USART0)), true)
+	USE_USARTS+=-DUSE_USART0
+endif
+ifeq ($(strip $(USE_USART1)), true)
+	USE_USARTS+=-DUSE_USART1
+endif
+ifeq ($(strip $(USE_USART2)), true)
+	USE_USARTS+=-DUSE_USART2
+endif
+ifeq ($(strip $(USE_USART3)), true)
+	USE_USARTS+=-DUSE_USART3
+endif
+
 # Defines passed to the preprocessor using -D
 ifeq ($(strip $(CHIP_MODEL)),ls2x)
 	N_FLASH_PAGES=256
@@ -95,7 +110,7 @@ else ifeq ($(strip $(CHIP_MODEL)),ls8x)
 else
 $(error Unknown CHIP_MODEL $(CHIP_MODEL), please use ls2x, ls4x or ls8x)
 endif
-PREPROC_DEFINES=-DPACKAGE=$(PACKAGE) -DBOOTLOADER=$(BOOTLOADER) -DDEBUG=$(DEBUG) -DN_FLASH_PAGES=$(N_FLASH_PAGES) $(USER_DEFINES)
+PREPROC_DEFINES=-DPACKAGE=$(PACKAGE) -DBOOTLOADER=$(BOOTLOADER) -DDEBUG=$(DEBUG) -DN_FLASH_PAGES=$(N_FLASH_PAGES) $(USE_USARTS) $(USER_DEFINES)
 
 # Compilation flags
 # Note : do not use -O0, as this might generate code too slow for some peripherals (notably the SPI controller)

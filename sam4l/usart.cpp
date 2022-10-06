@@ -6,6 +6,9 @@
 
 namespace USART {
 
+    // Internal state
+    bool _initialized = false;
+
     // Internal functions
     void rxBufferFullHandler();
 
@@ -26,30 +29,60 @@ namespace USART {
     extern struct GPIO::Pin PINS_RTS[];
 
     // Ports
-    struct USART {
-        unsigned long baudrate;
-        bool hardwareFlowControl;
-        CharLength charLength;
-        Parity parity;
-        StopBit stopBit;
-        uint8_t rxBuffer[BUFFER_SIZE];
-        uint8_t txBuffer[BUFFER_SIZE];
-        int rxBufferCursorR;
-        int rxBufferCursorW;
-        int txBufferCursor;
-        int rxDMAChannel = -1;
-        int txDMAChannel = -1;
-    };
-    struct USART _ports[N_PORTS];
+#ifdef USE_USART0
+    struct USART _port0;
+#endif
+#ifdef USE_USART1
+    struct USART _port1;
+#endif
+#ifdef USE_USART2
+    struct USART _port2;
+#endif
+#ifdef USE_USART3
+    struct USART _port3;
+#endif
+    struct USART* _ports[N_PORTS];
 
     int _rxDMAChannelsToPorts[DMA::N_CHANNELS_MAX];
 
     bool _portsEnabled[N_PORTS] = {false, false, false, false};
 
 
+    void init() {
+        _initialized = true;
+#ifdef USE_USART0
+        _ports[0] = &_port0;
+#else
+        _ports[0] = nullptr;
+#endif
+#ifdef USE_USART1
+        _ports[1] = &_port1;
+#else
+        _ports[1] = nullptr;
+#endif
+#ifdef USE_USART2
+        _ports[2] = &_port2;
+#else
+        _ports[2] = nullptr;
+#endif
+#ifdef USE_USART3
+        _ports[3] = &_port3;
+#else
+        _ports[3] = nullptr;
+#endif
+    }
+
     void enable(Port port, unsigned long baudrate, bool hardwareFlowControl, CharLength charLength, Parity parity, StopBit stopBit) {
+        if (!_initialized) {
+            init();
+        }
+
         const uint32_t REG_BASE = USART_BASE + static_cast<int>(port) * USART_REG_SIZE;
-        struct USART* p = &(_ports[static_cast<int>(port)]);
+        struct USART* p = _ports[static_cast<int>(port)];
+        if (p == nullptr) {
+            Error::happened(Error::Module::USART, ERR_PORT_NOT_AVAILABLE, Error::Severity::CRITICAL);
+            return;
+        }
 
         // Port configuration
         p->hardwareFlowControl = hardwareFlowControl;
@@ -134,7 +167,11 @@ namespace USART {
         _portsEnabled[static_cast<int>(port)] = false;
 
         const uint32_t REG_BASE = USART_BASE + static_cast<int>(port) * USART_REG_SIZE;
-        struct USART* p = &(_ports[static_cast<int>(port)]);
+        struct USART* p = _ports[static_cast<int>(port)];
+        if (p == nullptr) {
+            Error::happened(Error::Module::USART, ERR_PORT_NOT_AVAILABLE, Error::Severity::CRITICAL);
+            return;
+        }
 
         // Disable the DMA channels
         DMA::stopChannel(p->rxDMAChannel);
@@ -204,7 +241,10 @@ namespace USART {
         // Get the port that provoqued this interrupt
         int channel = static_cast<int>(Core::currentInterrupt()) - static_cast<int>(Core::Interrupt::DMA0);
         int portNumber = _rxDMAChannelsToPorts[channel];
-        struct USART* p = &(_ports[portNumber]);
+        struct USART* p = _ports[portNumber];
+        if (p == nullptr) {
+            return;
+        }
 
         // Reload the DMA channel
         int length = 0;
@@ -234,7 +274,11 @@ namespace USART {
     }
 
     int available(Port port) {
-        struct USART* p = &(_ports[static_cast<int>(port)]);
+        struct USART* p = _ports[static_cast<int>(port)];
+        if (p == nullptr) {
+            Error::happened(Error::Module::USART, ERR_PORT_NOT_AVAILABLE, Error::Severity::CRITICAL);
+            return 0;
+        }
 
         // Get the position of the second cursors from the DMA
         int cursor2 = p->rxBufferCursorW - DMA::getCounter(p->rxDMAChannel);
@@ -258,7 +302,11 @@ namespace USART {
     }
 
     bool contains(Port port, char byte) {
-        struct USART* p = &(_ports[static_cast<int>(port)]);
+        struct USART* p = _ports[static_cast<int>(port)];
+        if (p == nullptr) {
+            Error::happened(Error::Module::USART, ERR_PORT_NOT_AVAILABLE, Error::Severity::CRITICAL);
+            return false;
+        }
 
         // Check if the received buffer contains the specified byte
         int avail = available(port);
@@ -271,7 +319,11 @@ namespace USART {
     }
 
     char peek(Port port) {
-        struct USART* p = &(_ports[static_cast<int>(port)]);
+        struct USART* p = _ports[static_cast<int>(port)];
+        if (p == nullptr) {
+            Error::happened(Error::Module::USART, ERR_PORT_NOT_AVAILABLE, Error::Severity::CRITICAL);
+            return 0;
+        }
 
         if (available(port) > 0) {
             // Return the next char in the port's RX buffer
@@ -282,7 +334,11 @@ namespace USART {
     }
 
     bool peek(Port port, const char* test, int size) {
-        struct USART* p = &(_ports[static_cast<int>(port)]);
+        struct USART* p = _ports[static_cast<int>(port)];
+        if (p == nullptr) {
+            Error::happened(Error::Module::USART, ERR_PORT_NOT_AVAILABLE, Error::Severity::CRITICAL);
+            return false;
+        }
 
         if (available(port) >= size) {
             // Check whether the /size/ next chars in the buffer are equal to test
@@ -299,7 +355,11 @@ namespace USART {
 
     // Read one byte
     char read(Port port) {
-        struct USART* p = &(_ports[static_cast<int>(port)]);
+        struct USART* p = _ports[static_cast<int>(port)];
+        if (p == nullptr) {
+            Error::happened(Error::Module::USART, ERR_PORT_NOT_AVAILABLE, Error::Severity::CRITICAL);
+            return 0;
+        }
 
         if (available(port) > 0) {
             // Read the next char in the port's Rx buffer
@@ -333,7 +393,11 @@ namespace USART {
     // Read up to /size/ bytes
     // If buffer is nullptr, the bytes are simply poped from the buffer
     int read(Port port, char* buffer, int size, bool readUntil, char end) {
-        struct USART* p = &(_ports[static_cast<int>(port)]);
+        struct USART* p = _ports[static_cast<int>(port)];
+        if (p == nullptr) {
+            Error::happened(Error::Module::USART, ERR_PORT_NOT_AVAILABLE, Error::Severity::CRITICAL);
+            return 0;
+        }
 
         int avail = available(port);
         int n = 0;
@@ -404,7 +468,11 @@ namespace USART {
     }
 
     int write(Port port, const char* buffer, int size, bool async) {
-        struct USART* p = &(_ports[static_cast<int>(port)]);
+        struct USART* p = _ports[static_cast<int>(port)];
+        if (p == nullptr) {
+            Error::happened(Error::Module::USART, ERR_PORT_NOT_AVAILABLE, Error::Severity::CRITICAL);
+            return 0;
+        }
 
         // Wait until any previous write is finished
         waitWriteFinished(port);
@@ -438,7 +506,11 @@ namespace USART {
     }
 
     int write(Port port, char byte, bool async) {
-        struct USART* p = &(_ports[static_cast<int>(port)]);
+        struct USART* p = _ports[static_cast<int>(port)];
+        if (p == nullptr) {
+            Error::happened(Error::Module::USART, ERR_PORT_NOT_AVAILABLE, Error::Severity::CRITICAL);
+            return 0;
+        }
 
         // Wait until any previous write is finished
         waitWriteFinished(port);
@@ -535,7 +607,11 @@ namespace USART {
     }
 
     void flush(Port port) {
-        struct USART* p = &(_ports[static_cast<int>(port)]);
+        struct USART* p = _ports[static_cast<int>(port)];
+        if (p == nullptr) {
+            Error::happened(Error::Module::USART, ERR_PORT_NOT_AVAILABLE, Error::Severity::CRITICAL);
+            return;
+        }
 
         // Stop the Rx channel
         DMA::stopChannel(p->rxDMAChannel);
@@ -550,7 +626,11 @@ namespace USART {
 
     bool isWriteFinished(Port port) {
         const uint32_t REG_BASE = USART_BASE + static_cast<int>(port) * USART_REG_SIZE;
-        struct USART* p = &(_ports[static_cast<int>(port)]);
+        struct USART* p = _ports[static_cast<int>(port)];
+        if (p == nullptr) {
+            Error::happened(Error::Module::USART, ERR_PORT_NOT_AVAILABLE, Error::Severity::CRITICAL);
+            return false;
+        }
 
         // Check if the DMA has finished the transfer and if the Tx buffer is empty
         return DMA::isFinished(p->txDMAChannel) && (*(volatile uint32_t*)(REG_BASE + OFFSET_CSR)) & (1 << CSR_TXEMPTY);
@@ -563,7 +643,11 @@ namespace USART {
 
     void waitReadFinished(Port port, unsigned long timeout) {
         // Wait until no more bytes is received
-        struct USART* p = &(_ports[static_cast<int>(port)]);
+        struct USART* p = _ports[static_cast<int>(port)];
+        if (p == nullptr) {
+            Error::happened(Error::Module::USART, ERR_PORT_NOT_AVAILABLE, Error::Severity::CRITICAL);
+            return;
+        }
         unsigned long tStart = Core::time();
         int n = available(port);
         while (n == 0) {
