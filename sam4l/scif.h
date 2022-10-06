@@ -154,6 +154,7 @@ namespace SCIF {
 
     // RCFAST is a faster RC oscillator than RCSYS, which can operate at 4MHz, 8MHz or 12MHz
     void enableRCFAST(RCFASTFrequency frequency);
+    void enableRCFAST_noram(RCFASTFrequency frequency);
     void disableRCFAST();
     unsigned long getRCFASTFrequency();
 

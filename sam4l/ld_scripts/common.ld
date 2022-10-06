@@ -133,6 +133,15 @@ SECTIONS
         SECTION_BSS_END = . ;
     } > RAM
 
+    .noinit (NOLOAD) :
+    {
+        . = ALIGN(4);
+        SECTION_NOINIT_START = . ;
+        KEEP(*(.noinit));
+        . = ALIGN(4);
+        SECTION_NOINIT_END = . ;
+    } > RAM
+
     /* stack section */
     .stack (NOLOAD):
     {

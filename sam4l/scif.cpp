@@ -61,6 +61,12 @@ namespace SCIF {
         }
         _rcfastFrequencySelected = frequency;
 
+        enableRCFAST_noram(frequency);
+    }
+
+    // Custom function that enables RCFAST with no RAM access for use in pre_init()
+    // This does not set the internal state properly, enableRCFAST should still be called as soon as possible
+    void enableRCFAST_noram(RCFASTFrequency frequency) {
         // Unlock the RCFASTCFG register, which is locked by default as a safety mesure
         (*(volatile uint32_t*)(SCIF_BASE + OFFSET_UNLOCK))
                 = UNLOCK_KEY            // KEY : Magic word (see datasheet)

@@ -14,6 +14,10 @@ extern uint32_t SECTION_BSS_END;
 extern uint32_t SECTION_STACK_START;
 extern uint32_t SECTION_STACK_END;
 
+// Function called immediately after ResetHandler is called, before initializing the memory.
+// Should be defined by the user. Use carefully.
+void pre_init();
+
 // main() is *declared* here but should be *defined* by the user
 int main();
 
@@ -23,6 +27,9 @@ extern "C" void __libc_init_array(void);
 
 // Reset handler, called when the microcontroller is started
 void ResetHandler(void) {
+    // Call the pre_init function defined by the user
+    pre_init();
+
     // Copy data from flash to RAM. This includes things such as raw character strings and global
     // variables initialized to a non-zero value.
     const int SECTION_RELOCATE_LENGTH = &SECTION_RELOCATE_END - &SECTION_RELOCATE_START; // number of 4-bytes words
