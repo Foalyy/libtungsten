@@ -173,6 +173,11 @@ void RingBuffer::write(const uint8_t* buffer, unsigned int size) {
     _empty = false;
 }
 
+// Write some bytes into the internal buffer
+void RingBuffer::write(const char* buffer, unsigned int size) {
+    write(reinterpret_cast<const uint8_t*>(buffer), size);
+}
+
 // Number of bytes currently stored in the buffer
 unsigned int RingBuffer::size() const {
     if (_cursorW == _cursorR) {

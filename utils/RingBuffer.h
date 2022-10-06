@@ -32,6 +32,7 @@ public:
 
     // Write some bytes into the internal buffer
     void write(const uint8_t* buffer, unsigned int size);
+    void write(const char* buffer, unsigned int size);
 
     // Number of bytes currently stored in the buffer
     unsigned int size() const;
