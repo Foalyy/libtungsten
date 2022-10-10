@@ -236,7 +236,7 @@ namespace Core {
     }
 
     // Sleep for a specified amount of time
-    void sleep(SleepMode mode, unsigned long length, TimeUnit unit) {
+    void sleep(SleepMode mode, unsigned long length, TimeUnit unit, bool (*cbExit)()) {
         // Select the correct sleep mode
         if (mode >= SleepMode::SLEEP0 && mode <= SleepMode::SLEEP3) {
             *(volatile uint32_t*) SCR &= ~(uint32_t)(1 << SCR_SLEEPDEEP);
@@ -257,8 +257,8 @@ namespace Core {
             // amount of time
             AST::enableAlarm(length);
 
-            // Wait until the alarm has passed
-            while (!AST::alarmPassed()) {
+            // Wait until the alarm has passed or the optional callback returns true
+            while (!(AST::alarmPassed() || (cbExit != nullptr && cbExit()))) {
                 // WFI : Wait For Interrupt
                 // This special ARM instruction can put the chip in sleep mode until
                 // an interrupt with a sufficient priority is triggered
@@ -276,8 +276,8 @@ namespace Core {
     }
 
     // The default sleep mode is SLEEP0
-    void sleep(unsigned long length, TimeUnit unit) {
-        sleep(SleepMode::SLEEP0, length, unit);
+    void sleep(unsigned long length, TimeUnit unit, bool (*cbExit)()) {
+        sleep(SleepMode::SLEEP0, length, unit, cbExit);
     }
 
     // Enable SysTick as a simple counter clocked on the CPU clock

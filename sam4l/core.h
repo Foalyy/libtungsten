@@ -241,8 +241,8 @@ namespace Core {
 
     // Time and power related functions
     inline Time time() { return AST::time(); }
-    void sleep(unsigned long length, TimeUnit unit=TimeUnit::MILLISECONDS);
-    void sleep(SleepMode mode=SleepMode::SLEEP0, unsigned long length=0, TimeUnit unit=TimeUnit::MILLISECONDS);
+    void sleep(unsigned long length, TimeUnit unit=TimeUnit::MILLISECONDS, bool (*cbExit)()=nullptr);
+    void sleep(SleepMode mode=SleepMode::SLEEP0, unsigned long length=0, TimeUnit unit=TimeUnit::MILLISECONDS, bool (*cbExit)()=nullptr);
     void waitMicroseconds(unsigned long length);
     void enableSysTick();
     void disableSysTick();
