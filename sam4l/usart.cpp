@@ -30,16 +30,16 @@ namespace USART {
 
     // Ports
 #ifdef USE_USART0
-    struct USART _port0;
+    struct USART _port0 __attribute__ ((section (".noinit")));
 #endif
 #ifdef USE_USART1
-    struct USART _port1;
+    struct USART _port1 __attribute__ ((section (".noinit")));
 #endif
 #ifdef USE_USART2
-    struct USART _port2;
+    struct USART _port2 __attribute__ ((section (".noinit")));
 #endif
 #ifdef USE_USART3
-    struct USART _port3;
+    struct USART _port3 __attribute__ ((section (".noinit")));
 #endif
     struct USART* _ports[N_PORTS];
 
