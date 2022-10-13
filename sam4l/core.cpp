@@ -47,6 +47,12 @@ namespace Core {
         // Change the core vector pointer to the new table
         (*(volatile uint32_t*) VTOR) = (uint32_t) _isrVector;
 
+        // Enable the lower-priority faults
+        (*(volatile uint32_t*) SHCSR)
+            |= 1 << 16      // MEMFAULTENA : enable MemManage faults
+            |  1 << 17      // BUSFAULTENA : enable BusFault
+            |  1 << 18;     // USGFAULTENA : enable UsageFault
+
         // Configure the Peripheral Debug register
         (*(volatile uint32_t*) PDBG)
             = 1 << PDBG_WDT     // Freeze WDT when Core is halted in debug mode

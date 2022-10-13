@@ -18,6 +18,10 @@ namespace Core {
     const uint32_t AIRCR = 0xE000ED0C;      // Application Interrupt and Reset Control Register
     const uint32_t SCR = 0xE000ED10;        // System Control Register
     const uint32_t CCR = 0xE000ED14;        // Configuration and Control Register
+    const uint32_t SHPR1 = 0xE000ED18;      // System Handler Priority Register 1
+    const uint32_t SHPR2 = 0xE000ED1C;      // System Handler Priority Register 2
+    const uint32_t SHPR3 = 0xE000ED20;      // System Handler Priority Register 3
+    const uint32_t SHCSR = 0xE000ED24;      // System Handler Control and State Register
     const uint32_t CFSR = 0xE000ED28;       // Configurable Fault Status Register
     const uint32_t HFSR = 0xE000ED2C;       // HardFault Status Register
     const uint32_t DFSR = 0xE000ED30;       // Debug Fault Status Register
