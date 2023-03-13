@@ -108,6 +108,31 @@ namespace USB {
     };
     char16_t _customStringDescriptors[static_cast<int>(StringDescriptors::NUMBER)][MAX_STRING_DESCRIPTOR_SIZE];
 
+    // OsString and Microsoft Compatible ID Feature Descriptor
+    // Used to auto-install the WinUSB driver on Windows using the Microsoft's proprietary WCID extension
+    // See https://github.com/pbatard/libwdi/wiki/WCID-Devices
+    const uint8_t OS_STRING_INDEX = 0xEE;
+    const uint8_t OS_STRING_VENDOR_CODE = 0xFF; // arbitrary
+    const uint8_t OS_STRING[] = {0x4D, 0x00, 0x53, 0x00, 0x46, 0x00, 0x54, 0x00, 0x31, 0x00, 0x30, 0x00, 0x30, 0x00, OS_STRING_VENDOR_CODE, 0x00};
+    StringDescriptor _osStringDescriptor = {
+        .bLength = 0x12,
+        .bDescriptorType = 0x03,
+        .bString = (const char16_t*)OS_STRING
+    };
+    const uint16_t MICROSOFT_COMPATIBLE_ID_DESCRIPTOR_INDEX = 0x0004;
+    MicrosoftCompatibleIdDescriptor _microsoftCompatibleIdDescriptor = {
+        .dLength = 0x28,
+        .wVersion = 0x0100,
+        .wIndex = MICROSOFT_COMPATIBLE_ID_DESCRIPTOR_INDEX,
+        .bSections = 0x01,
+        .reserved1 = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+        .bInterfaceNumber = 0x00,
+        .bReserved2 = 0x01,
+        .compatibleId = {0x57, 0x49, 0x4E, 0x55, 0x53, 0x42, 0x00, 0x00}, // "WINUSB\0\0"
+        .subCompatibleId = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+        .reserved3 = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+    };
+
     extern uint8_t INTERRUPT_PRIORITY;
 
     // User handlers
@@ -513,10 +538,10 @@ namespace USB {
 
         // Answer the last SETUP packet received
         if (_setupPacketAvailable) {
+            uint8_t* bank = (uint8_t*)_epRAMDescriptors[EP_N * EP_DESCRIPTOR_SIZE + EP_ADDR];
 
             // Standard request
             if (_lastSetupPacket.requestType == SetupRequestType::STANDARD) {
-                uint8_t* bank = (uint8_t*)_epRAMDescriptors[EP_N * EP_DESCRIPTOR_SIZE + EP_ADDR];
 
                 // Request recipient : device
                 if (_lastSetupPacket.recipent == SetupRecipient::DEVICE) {
@@ -596,6 +621,16 @@ namespace USB {
                             const int length = min(stringDescriptor.bLength, _lastSetupPacket.wLength);
                             memcpy(bank, (uint8_t*)&(stringDescriptor), 2); // bLength and bDescriptorType
                             memcpy(bank + 2, stringDescriptor.bString, length - 2); // Actual string content
+                            return length;
+
+                        // OS string descriptor
+                        } else if (descriptorType == USBDESC_STRING && descriptorIndex == OS_STRING_INDEX) {
+                            _lastSetupPacket.handled = true;
+
+                            // Copy the descriptor to the bank
+                            const int length = min(_osStringDescriptor.bLength, _lastSetupPacket.wLength);
+                            memcpy(bank, (uint8_t*)&(_osStringDescriptor), 2); // bLength and bDescriptorType
+                            memcpy(bank + 2, _osStringDescriptor.bString, length - 2); // Actual string content
                             return length;
 
                         }
@@ -714,17 +749,29 @@ namespace USB {
                 }
 
             } else if (_lastSetupPacket.requestType == SetupRequestType::VENDOR) {
-                // Call user handler if this is a IN or No Data request. For an OUT request with data,
-                // the user handler will be called by ep0OUTHandler() when the data has been received
-                if (_controlHandler != nullptr) {
-                    // Make sure the IN handler will not be called again when the IN response is sent
-                    disableINInterrupt(0);
+                if (_lastSetupPacket.bmRequestType == 0xC0 && _lastSetupPacket.bRequest == OS_STRING_VENDOR_CODE) {
+                    // Windows-specific request, part of the WCID system, sent by the OS to auto-detect the driver to install
+                    if (_lastSetupPacket.wIndex == MICROSOFT_COMPATIBLE_ID_DESCRIPTOR_INDEX) {
+                        _lastSetupPacket.handled = true;
 
-                    if (_lastSetupPacket.direction == EPDir::IN || _lastSetupPacket.wLength == 0) {
-                        int bytesToSend = _controlHandler(_lastSetupPacket, _bankEP0, min(_lastSetupPacket.wLength, BANK_EP0_SIZE));
-                        return min(_lastSetupPacket.wLength, bytesToSend);
+                        // Copy the descriptor to the bank
+                        const int length = min(_microsoftCompatibleIdDescriptor.dLength, _lastSetupPacket.wLength);
+                        memcpy(bank, (uint8_t*)&_microsoftCompatibleIdDescriptor, length);
+                        return length;
                     }
-                    // For an OUT request, _lastSetupPacket.handled was set previously by ep0OUTHandler()
+                } else {
+                    // Call user handler if this is a IN or No Data request. For an OUT request with data,
+                    // the user handler will be called by ep0OUTHandler() when the data has been received
+                    if (_controlHandler != nullptr) {
+                        // Make sure the IN handler will not be called again when the IN response is sent
+                        disableINInterrupt(0);
+
+                        if (_lastSetupPacket.direction == EPDir::IN || _lastSetupPacket.wLength == 0) {
+                            int bytesToSend = _controlHandler(_lastSetupPacket, _bankEP0, min(_lastSetupPacket.wLength, BANK_EP0_SIZE));
+                            return min(_lastSetupPacket.wLength, bytesToSend);
+                        }
+                        // For an OUT request, _lastSetupPacket.handled was set previously by ep0OUTHandler()
+                    }
                 }
             }
 
