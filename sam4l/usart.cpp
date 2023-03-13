@@ -457,7 +457,7 @@ namespace USART {
 
     int write(Port port, int number, uint8_t base, bool async) {
         // Write a human-readable number in the given base
-        const int bufferSize = 32; // Enough to write a 32-bits word in binary
+        const int bufferSize = 32; // Enough to write a 32-bit word in binary
         char buffer[bufferSize];
         int cursor = 0;
         if (base < 2) {
@@ -496,8 +496,6 @@ namespace USART {
             buffer[cursor - i - 1] = c;
         }
 
-        buffer[cursor] = 0;
-        cursor++;
         return write(port, buffer, cursor, async);
     }
 
