@@ -405,10 +405,38 @@ namespace USB {
                         ep->handlers[static_cast<int>(EPHandlerType::SETUP)](0);
                     }
 
-                    // Clear interrupt to acknoledge the packet and free the bank
+                    // Clear interrupt to acknowledge the packet and free the bank
                     (*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR + i * 4))
                         = 1 << UESTA_RXSTPI;
+                }
+                
+                // OUT packet
+                // We handle OUT interrupts before IN interrupts to avoid repeating the IN handler
+                // when an OUT acknowledge tocken is sent by the host after a Device-to-Host transfer
+                if (*uecon & *uesta & (1 << UESTA_RXOUTI)) {
+                    // Number of bytes received
+                    int receivedPacketSize = _epRAMDescriptors[i * EP_DESCRIPTOR_SIZE + EP_PCKSIZE] & PCKSIZE_BYTE_COUNT_MASK;
 
+                    // Call the handler to read the packet content
+                    if (ep->handlers[static_cast<int>(EPHandlerType::OUT)] != nullptr) {
+                        ep->handlers[static_cast<int>(EPHandlerType::OUT)](receivedPacketSize);
+                    }
+
+                    // Clear interrupt
+                    (*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR + i * 4))
+                        = 1 << UESTA_RXOUTI;
+
+                    // If this is an OUT endpoint, clear FIFOCON to free the bank
+                    if (ep->type != EPType::CONTROL && ep->direction == EPDir::OUT) {
+                        (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0CLR + i * 4))
+                            = 1 << UECON_FIFOCON;
+                    }
+
+                    // If this is an IN or No Data transfer, an OUT packet means the transfer is finished or aborted
+                    if (_lastSetupPacket.direction == EPDir::IN || _lastSetupPacket.wLength == 0) {
+                        // Disable IN interrupt
+                        disableINInterrupt(i);
+                    }
                 }
 
                 // IN packet
@@ -435,32 +463,6 @@ namespace USB {
                     if (ep->type != EPType::CONTROL && ep->direction == EPDir::IN) {
                         (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0CLR + i * 4))
                             = 1 << UECON_FIFOCON;
-                    }
-                }
-                
-                // OUT packet
-                if (*uecon & *uesta & (1 << UESTA_RXOUTI)) {
-                    // Number of bytes received
-                    int receivedPacketSize = _epRAMDescriptors[i * EP_DESCRIPTOR_SIZE + EP_PCKSIZE] & PCKSIZE_BYTE_COUNT_MASK;
-
-                    // Call the handler to read the packet content
-                    if (ep->handlers[static_cast<int>(EPHandlerType::OUT)] != nullptr) {
-                        ep->handlers[static_cast<int>(EPHandlerType::OUT)](receivedPacketSize);
-                    }
-
-                    // Clear interrupt
-                    (*(volatile uint32_t*)(USB_BASE + OFFSET_UESTA0CLR + i * 4))
-                        = 1 << UESTA_RXOUTI;
-
-                    // If this is an OUT endpoint, clear FIFOCON to free the bank
-                    if (ep->type != EPType::CONTROL && ep->direction == EPDir::OUT) {
-                        (*(volatile uint32_t*)(USB_BASE + OFFSET_UECON0CLR + i * 4))
-                            = 1 << UECON_FIFOCON;
-                    }
-
-                    // If this is an IN or No Data transfer, an OUT packet means the transfer is finished or aborted
-                    if (_lastSetupPacket.direction == EPDir::IN || _lastSetupPacket.wLength == 0) {
-                        // Disable IN interrupt
                     }
                 }
             }
@@ -585,7 +587,7 @@ namespace USB {
                             memcpy(bank, (uint8_t*)&_string0Descriptor, length);
                             return length;
 
-                        // String descriptor
+                        // Device string descriptor
                         } else if (descriptorType == USBDESC_STRING && descriptorIndex <= static_cast<int>(StringDescriptors::NUMBER)) {
                             _lastSetupPacket.handled = true;
 
@@ -747,7 +749,7 @@ namespace USB {
         if (_lastSetupPacket.direction == EPDir::IN) {
             // This is an ACK from the host
             _setupPacketAvailable = false;
-            disableINInterrupt(0);
+            abortINTransfer(0);
 
         } else {
             // This is an OUT packet containing data
