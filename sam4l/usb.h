@@ -232,6 +232,18 @@ namespace USB {
         uint8_t bDescriptorType;
         const char16_t* bString;
     };
+    struct MicrosoftCompatibleIdDescriptor {
+        uint32_t dLength;
+        uint16_t wVersion;
+        uint16_t wIndex;
+        uint8_t bSections;
+        uint8_t reserved1[7];
+        uint8_t bInterfaceNumber;
+        uint8_t bReserved2;
+        uint8_t compatibleId[8];
+        uint8_t subCompatibleId[8];
+        uint8_t reserved3[6];
+    };
     extern DeviceDescriptor _deviceDescriptor;
     extern ConfigurationDescriptor _configurationDescriptor;
     extern InterfaceDescriptor _interfaceDescriptor;
