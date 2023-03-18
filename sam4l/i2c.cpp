@@ -173,7 +173,7 @@ namespace I2C {
             if (Core::time() > t0 + TIMEOUT) {
                 Error::happened(Error::Module::I2C, ERR_TIMEOUT, Error::Severity::CRITICAL);
             }
-            Core::sleep(1);
+            Core::waitMicroseconds(10);
         }
 
         // Check for arbitration lost again now that the transfer is complete
@@ -235,7 +235,7 @@ namespace I2C {
             if (Core::time() > t0 + TIMEOUT) {
                 Error::happened(Error::Module::I2C, ERR_TIMEOUT, Error::Severity::CRITICAL);
             }
-            Core::sleep(1);
+            Core::waitMicroseconds(10);
         }
 
         // Check for arbitration lost again now that the transfer is complete
@@ -329,7 +329,7 @@ namespace I2C {
                 if (Core::time() > t0 + TIMEOUT) {
                     Error::happened(Error::Module::I2C, ERR_TIMEOUT, Error::Severity::CRITICAL);
                 }
-                Core::sleep(1);
+                Core::waitMicroseconds(10);
             }
 
         } else {
@@ -338,7 +338,7 @@ namespace I2C {
                 if (Core::time() > t0 + TIMEOUT) {
                     Error::happened(Error::Module::I2C, ERR_TIMEOUT, Error::Severity::CRITICAL);
                 }
-                Core::sleep(1);
+                Core::waitMicroseconds(10);
             }
         }
 
@@ -426,7 +426,7 @@ namespace I2C {
             if (Core::time() > t0 + TIMEOUT) {
                 Error::happened(Error::Module::I2C, ERR_TIMEOUT, Error::Severity::CRITICAL);
             }
-            Core::sleep(1);
+            Core::waitMicroseconds(10);
         }
 
         // Check for arbitration lost again now that the transfer is complete
@@ -585,7 +585,7 @@ namespace I2C {
                 if (Core::time() > t0 + TIMEOUT) {
                     Error::happened(Error::Module::I2C, ERR_TIMEOUT, Error::Severity::CRITICAL);
                 }
-                Core::sleep(1);
+                Core::waitMicroseconds(10);
             }
 
             return n - DMA::getCounter(p->rxDMAChannel);
@@ -661,7 +661,7 @@ namespace I2C {
                 if (Core::time() > t0 + TIMEOUT) {
                     Error::happened(Error::Module::I2C, ERR_TIMEOUT, Error::Severity::CRITICAL);
                 }
-                Core::sleep(1);
+                Core::waitMicroseconds(10);
             }
 
             return DMA::isFinished(p->txDMAChannel);
