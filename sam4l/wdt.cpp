@@ -128,7 +128,7 @@ namespace WDT {
                       | 1 << CTRL_FCD                               // FCD : skip flash calibration after reset
                       | psel << CTRL_PSEL                           // PSEL : timeout counter
                       | 1 << CTRL_CEN                               // CEN : enable the clock
-                      | static_cast<int>(useOSC32K) << CTRL_CSSEL   // CEN : enable the clock
+                      | static_cast<int>(useOSC32K) << CTRL_CSSEL   // CSSEL : clock source
                       | tban << CTRL_TBAN;                          // TBAN : time ban for window mode
         (*(volatile uint32_t*)(WDT_BASE + OFFSET_CTRL)) // Configure
             = ctrl
@@ -158,6 +158,9 @@ namespace WDT {
             Core::setInterruptHandler(Core::Interrupt::WDT, interruptHandlerWrapper);
             Core::enableInterrupt(Core::Interrupt::WDT, INTERRUPT_PRIORITY);
         }
+
+        // Make sure the watchdog starts from zero
+        clear();
     }
 
     bool isEnabled() {
